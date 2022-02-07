@@ -1,0 +1,129 @@
+---
+title: "NLP para el matchmaking de empleos y candidatos"
+author: "Rocío Parrilla Merino"
+date: "Julio de 2017"
+output:
+  ioslides_presentation:
+    highlight: tango
+  slidy_presentation:
+    highlight: tango
+subtitle: Máster en Data Science y Big Data
+runtime: shiny
+---
+
+<style type="text/css">
+slides > slide:not(.nobackground):after {
+  content: '';
+ slide.backdrop {
+  background: white}
+}
+
+.zoomDiv {
+  opacity: 0;
+  position:absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 50;
+  transform: translate(-50%, -50%);
+  box-shadow: 0px 0px 50px #888888;
+  max-height:100%; 
+  overflow: scroll;
+}
+
+.zoomImg {
+  width: 100%;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+## Índice
+
+ Hola, esto es un ejemplo en Rmarkdown.
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(shiny)
+library(data.table)
+library(wordcloud)
+library(leaflet)
+library(jsonlite)
+
+
+ shinyApp(
+
+ui <- fluidPage(
+  selectInput(
+    inputId = 'variable',
+    label = 'Elija variable a representar',
+    choices = c('turistas', 'longitud', 'latitud')
+  ),
+  
+  leafletOutput(outputId = 'mapa')
+),
+
+server <- function(input, output){
+  output$mapa <- renderLeaflet({
+    geojson <- readLines('../datos_ejercicios/comunidades.json', warn = FALSE) %>%
+      paste(collapse = '\n') %>%
+      fromJSON(simplifyVector = FALSE)
+    
+    # Default styles for all features
+    
+    geojson$style = list(
+      weight = 1,
+      color = "#555555",
+      opacity = 1,
+      fillOpacity = 0.5
+    )
+    
+    properties <- lapply(geojson$features, function(feat){ feat$properties })
+    
+    variable <- c()
+    
+    if(input$variable == 'turistas'){
+      variable <- sapply(properties, function(prop){ prop$turistas })
+    } else if(input$variable == 'longitud'){
+      variable <- sapply(properties, function(prop){ prop$lon})
+    } else{
+      variable <- sapply(properties, function(prop){ prop$lat})
+    }
+    
+    pal <- colorNumeric('Greens', variable)
+    
+    # Style for each polygon
+    
+    if(input$variable == 'turistas'){
+      geojson$features <- lapply(geojson$features, function(feat) { 
+        feat$properties$style <- list(fillColor = pal(feat$properties$turistas))
+        return(feat)
+      })
+    } else if(input$variable == 'longitud'){
+      geojson$features <- lapply(geojson$features, function(feat) { 
+        feat$properties$style <- list(fillColor = pal(feat$properties$lon))
+        return(feat)
+      })
+    } else{
+      geojson$features <- lapply(geojson$features, function(feat) { 
+        feat$properties$style <- list(fillColor = pal(feat$properties$lat))
+        return(feat)
+      })
+    }
+    
+    leaflet() %>% setView(lng = -3.68, lat = 40.43, zoom = 4) %>%
+                  addTiles(urlTemplate = 'http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png') %>%
+                  addGeoJSON(geojson)  %>% 
+                  addLegend("bottomright", pal = pal, values = variable,
+                            title = input$variable, opacity = 1)
+  })
+}
+
+)
+
+```

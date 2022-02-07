@@ -1,0 +1,9 @@
+El dataset contiene información sobre costes de seguros médicos de personas de EEUU. 
+
+edad: edad del asegurado
+co_genero: código de género del asegurado (cruza con el catálogo de género)
+imc: índice de masa corporal del asegurado
+num_hijos: número de hijos del asegurado
+co_fumador: código de fumador, indica si el asegurado es fumador o no (cruza con el catálogo de fumador)
+region: región de residencia del asegurado
+costes_seguro: costes médicos facturados por el seguro médico

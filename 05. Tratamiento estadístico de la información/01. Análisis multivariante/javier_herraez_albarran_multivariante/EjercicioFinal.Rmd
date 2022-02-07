@@ -1,0 +1,526 @@
+---
+title: <span style="color:darkblue">Ejercicio Final - Análisis multivariante</span>
+author: "Javier Herráez Albarrán"
+date: "24/1/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+<h1 style="color:darkblue">Análisis Pokémon</h1>
+
+<h2 style="color:darkblue">Contexto</h2>
+
+La serie de viedeojuegos de Pokemon marcó la infancia de millones de personas de todo el mundo a partir de su primera edición. El juego se basaba en la captura de Pokemon, unas criaturas basadas en animales, plantas o seres mitológicos, con el fin de hacerlos combatir entre ellos. Estos Pokemon poseían una serie de carácterísticas relativas a sus cualidades en batalla como podían ser puntos de ataque, defensa o velocidad.
+
+Por lo tanto, ¿podemos conocer cuál era el pokemon más fuerte en base a estas y más características?
+
+Como el juego consistía en capturar a todos estos pokemon, ¿estaba relacionado lo fuerte que era un pokemon con lo díficil que era de capturar?
+
+<h2 style="color:darkblue">Data</h2>
+
+Trataremos las 7 primeras generaciones de pokemon, ya que en cada nueva edición del videojuego creaban nuevas criaturas, con en total más de 800 pokemon.
+
+Los datos con los que trabajaremos los hemos recogido de: https://www.kaggle.com/rounakbanik/pokemon, que a su vez está extraida de http://serebii.net/.
+
+El resumen de las variables del dataset es el siguiente:
+
+- name: El nombre en inglés del Pokémon.
+- japanese_name: El nombre japonés original del Pokémon.
+- pokedex_number: El número de entrada del Pokémon en el Pokédex Nacional.
+- percent_male: El porcentaje de las especies que son machos. NA si el Pokémon no tiene género.
+- type1: El tipo primario del Pokémon.
+- type2: El tipo secundario del Pokémon.
+- classification: La clasificación de los Pokémon.
+- height_m: Altura del Pokémon en metros.
+- weight_kg: El Peso del Pokémon en kilogramos.
+- capture_rate: Ratio de captura del Pokémon.
+- baseeggsteps: El número de pasos necesarios para eclosionar un huevo del Pokémon.
+- abilities: Una lista ordenada de habilidades que el Pokémon es capaz de tener.
+- experience_growth: El crecimiento de la experiencia de los Pokémon.
+- base_happiness: Felicidad Base del Pokémon.
+- against_?: Dieciocho características que denotan la cantidad de daño recibido contra un ataque de un tipo particular.
+- hp: La Salud Base del Pokémon.
+- attack: El Ataque Base de los Pokémon.
+- defense: La Defensa Base de los Pokémon.
+- sp_attack: El Ataque Especial Base del Pokémon.
+- sp_defense: La Defensa Especial Base del Pokémon.
+- speed: La Velocidad Base del Pokémon.
+- generation: La generación numerada en la que se introdujo por primera vez el Pokémon.
+- is_legendary: Indica si el Pokémon es legendario.
+
+<h2 style="color:darkblue">Preparar los datos & Análisis descriptivo</h2>
+
+Lo primero que haremos será importar las librerías necesarias, cargar el dataset y hacer un breve resumen de nuestros datos.
+
+```{r , warning=FALSE, message=FALSE}
+library(tidyverse)
+library(GGally)
+library(factoextra)
+```
+
+```{r}
+pokemon <- read.csv("pokemon.csv", encoding = "UTF-8")
+```
+
+```{r}
+str(pokemon)
+```
+
+```{r}
+summary(pokemon)
+```
+
+Aquí podemos ver como las variables de tipo against_ van desde el 0.25 hasta 4, mientras que las de combate como hp, attack, defense o speed suelen rondar un máximo de 200 0 250. Entre las de tipo numérico destaca experience_growth con un mínimo de 600000.
+
+```{r}
+par(mar=c(8, 4, 4, 2) + 0.1)
+barplot(colMeans(is.na(pokemon[,1:20])), las=2)
+barplot(colMeans(is.na(pokemon[,21:length(pokemon)])), las=2)
+```
+
+Vemos que hay cierto porcentaje de las variables percetange_male, height_m y weight_kg con valores NAs. Más adelante trataremos sus casos.
+
+No trabajaremos con las variables against_ ya que si hacemos una búsqueda rápida en Internet están muy relacionadas con el tipo del pokemon, por lo que es posible que no nos aporte gran información.
+Además, dejaremos de lado las variables string que no nos ayuden a la hora de entender los datos y otras como generation o pokedex_number que corresponden a identificadores.
+
+```{r}
+pokemon <- pokemon %>% 
+  select(- starts_with("against_")) %>% 
+  select(- c("abilities", "classfication", "type2", "generation", "pokedex_number", "japanese_name"))
+str(pokemon)
+```
+
+Observamos que la variable capture_rate es de tipo chr cuando lo más normal sería que fuese de tipo numérico. Vemos que sucede.
+
+```{r}
+unique(pokemon$capture_rate)
+```
+
+Observamos que entre sus valores posibles existe una cadena de carácteres, veamos que pokemon tiene está característica.
+
+```{r}
+pokemon[pokemon$capture_rate == "30 (Meteorite)255 (Core)",]$name
+```
+
+Buscando en la web encontramos que Minior es un pokemon con dos formas diferentes y que, dependiendo de su forma tiene un capture_rate u otro. Por lo tanto, nos quedaremos con el valor que tiene su forma más usual, Meteorite.
+
+```{r}
+pokemon[pokemon$capture_rate == "30 (Meteorite)255 (Core)",]$capture_rate <- 30
+pokemon$capture_rate <- as.integer(pokemon$capture_rate)
+summary(pokemon$capture_rate)
+```
+
+Vemos un resumen de la variable capture_rate con valores que van desde 3 (más difícil de capturar) a 255 (más fácil).
+
+Por otro lado existe una variable sospechosa de ser la suma de otras tantas, base_total. Vamos a comprobarlo.
+
+```{r}
+sum <- rowSums(pokemon[ , c("attack", "defense", "hp", "sp_attack", "sp_defense", "speed")])
+all(sum == pokemon$base_total)
+```
+
+Efectivamente, base_total es la suma de varias variables, por lo que decidimos eliminarla.
+
+```{r}
+pokemon <- pokemon %>% 
+  select(- c("base_total"))
+```
+
+Habíamos visto una gran cantidad de NAs para la variable percentage_male y leyendo la documentación, vemos que es debido a que existen pokemon sin género. Decidimos asignarle a estos pokemon el porcentage de 50 %, por no tener que eliminar la variable.
+
+```{r}
+pokemon[is.na(pokemon$percentage_male),]$percentage_male <- 50
+```
+
+Para las variables weight_kg y height_m habíamos visto que existían también observaciones con NAs. 
+
+```{r}
+pokemon[(is.na(pokemon$weight_kg) | is.na(pokemon$height_m)), c("weight_kg", "height_m")]
+```
+
+Vemos que todas aquellas observaciones que tiene NA en una de las columnas tiene NA en la otra. en total son 20 observaciones, así que decidimos eliminar estos pokemon ya que intuímos que puede ser una característica a tener en cuenta en nuestro análisis.
+
+```{r}
+pokemon <- pokemon[!(is.na(pokemon$weight) | is.na(pokemon$height)),]
+```
+
+Procedemos a guardar los nombres y los tipos de los pokemon para más adelante, a la vez que los eliminamos del dataframe.
+
+```{r}
+pokemon_names <- pokemon$name
+pokemon_type <- pokemon$type1
+pokemon <- pokemon %>% 
+  select(- c("name", "type1"))
+```
+
+Dibujamos un boxplot para hacernos una idea de nuestro datos y de si será necesario scalarlos. 
+
+```{r}
+par(mar=c(8, 5, 2, 2) + 0.1)
+boxplot(pokemon, las=2, col="darkblue")
+```
+
+Vemos que efectivamente, necesitaremos escalarlos para ver su distribución (ya habíamos visto anteriormente que el mínimo de experience_growth era de 600000).
+
+```{r}
+par(mar=c(8, 4, 2, 2) + 0.1)
+boxplot(scale(pokemon), las=2, col="darkblue")
+```
+
+Podemos sacra también gráficos que nos pueden mostrar los valores de las variables 2 a 2 para ver como se distribuyen los puntos en estas variables. Aunque nos sale un gráfico demasiado grande del que poco o nada podemos concluir, menos que vemos bastantes nubes de puntos.
+
+```{r, fig.width=30, fig.height=30}
+pairs(pokemon)
+```
+
+También, podemos ver la matriz de correlaciones.
+
+```{r}
+ggcorr(pokemon, label = T, hjust = .7, size = 2.5)
+```
+
+Vemos que la única correlación alta es la de las variables base_egg_steps y is_legendary.
+
+<h2 style="color:darkblue">PCA</h2>
+
+Procedemos a realizar el PCA y ver resultados.
+
+```{r}
+pca = prcomp(pokemon, scale=T)
+summary(pca)
+```
+
+```{r}
+fviz_screeplot(pca, addlabels = TRUE)
+```
+
+Podemos observar que la primera componente únicamente nos explicaría el 36.3% de la variabilidad de nuestros datos, mientras que la segunda 10.9% y siguen disminuyendo progresivamente. Para alcanzar por lo menos un 70% del dataset necesitaríamos al menos analizar las primeras 5 componentes.
+
+<h3 style="color:darkblue">Interpretación de las componentes</h3>
+
+Para la primera componente de todas.
+
+```{r}
+par(mar=c(8, 4, 2, 2) + 0.1)
+barplot(pca$rotation[,1], las=2, col="darkblue")
+```
+
+Parece que la primera componente tiene en cuenta de manera positiva todas las variables que tienen relación con estadísticas de combate como hp, attack, defense o speed; el tamaño con weight_kg y height_m; y variables como base_egg_steps e is_legendary. De manera contraria, se sitúan base_happiness o capture_rate. Por último, vemos que el porcentaje de sexo no importa prácticamente nada.
+
+Esta componente parece bastante coherente con lo que podemos conocer de los pokemon: cuanto más fuertes son más stats tienen en combate, más grandes son, cuesta más "tener o criar" uno y si es legendario, mejor. Además, por el otro lado es lógico que sean más difíciles de capturar y descubrimos que cunato menos felices, más fuertes son.
+
+Podemos ver que variables han contribuido más a esta primera componente.
+
+```{r}
+fviz_contrib(pca, choice = "var", axes = 1)
+```
+
+Comprobamos que base_egg_steps e is_legendary son las que más aportan, tras ellas capture_rate, después las variables del tamaño y las de combate. Vemos que percentaje_male es prácticamente anecdótica.
+
+Podemos sacar un ranking según esta componente donde en loos primeros puestos quedarían los siguientes pokemon.
+
+```{r}
+pokemon_names[order(pca$x[,1], decreasing = T)][1:10]
+```
+
+Si conocemos un poco el videojuego, sabemos que son prácticamente los pokemon más poderosos de su universo.
+Si no conociéramos esto,podríamos fijarnos en la media de las estadísticas de estos 10 pokemons comparado con el resto.
+
+```{r}
+mean_pokemon <- colMeans(pokemon)
+mean_best10 <- colMeans(pokemon[order(pca$x[,1], decreasing = T),][1:10,])
+diff <- sprintf("%1.2f%%", 100*(mean_best10 - mean_pokemon) / mean_pokemon)
+data.frame("Mean" = format(mean_pokemon, scientific =F), 
+           "Mean Best10" = format(mean_best10, scientific =F),  
+           diff)
+```
+
+Vemos que en la diferencia de estos 10 más poderosos con el resto concuerda con las variables que nos indicaba la componente destacando como veíamos is_legendary, base_egg_steps y las variables del tamaño.
+
+Podemos ver también que observaciones son las que más nos han aportado a la hora de crear esta componente.
+
+```{r}
+fviz_contrib(pca, choice = "ind", axes = 1, top=100)
+```
+
+Mejor centrándonos en los 15 primeros.
+
+```{r}
+names_z1 = pokemon_names[order(get_pca_ind(pca)$contrib[,1],decreasing=T)]
+fviz_contrib(pca, choice = "ind", axes = 1, top=15)+scale_x_discrete(labels=names_z1)
+```
+
+Vemos que los primeros coinciden justamente con los que habíamos visto que eran los más poderosos según esta componente.
+
+Ahora pasamos a analizar la segunda componente.
+
+```{r}
+par(mar=c(8, 4, 2, 2) + 0.1)
+barplot(pca$rotation[,2], las=2, col="darkblue")
+```
+
+Vemos que en ésta, la variable que más destaca en el eje positivo es base_happiness, ambas variables de defense, además del porcentaje de sexo masculino. Po rle lado contrario, nos encontramos base_egg_steps, capture_rate, experience_growth e is_legendary.
+
+Vemos que son pokemon más felices de inicio en los cuales no importa tanto lo que cueste "criarlos" o su capacidad de crecimineto de experiencia.
+
+Al volver a hacer un ranking con esta nueva componente nos encontramos a los siguientes en los primeros puestos.
+
+```{r}
+pokemon_names[order(pca$x[,2], decreasing = T)][1:10]
+```
+
+Podemos comparar sus características con la media del resto al igual que hemos hecho antes.
+
+```{r}
+mean_pokemon <- colMeans(pokemon)
+mean_best10 <- colMeans(pokemon[order(pca$x[,2], decreasing = T),][1:10,])
+diff <- sprintf("%1.2f%%", 100*(mean_best10 - mean_pokemon) / mean_pokemon)
+data.frame("Mean" = format(mean_pokemon, scientific =F), 
+           "Mean Best10" = format(mean_best10, scientific =F),  
+           diff)
+```
+
+Vemos que en este caso lo que más ha variado respecto a la media ha sido las variables de defensa y la is_legendary.
+
+Comprobamos cuales han sido las variables que más han aportado en la segunda componente.
+
+```{r}
+fviz_contrib(pca, choice = "var", axes = 2)
+```
+
+Nos encontramos que base_happiness, base_egg_steps, capture_rate e is_lengendary son las que más han aportado, mientras que las más enfocadas al combate y sobretdo al tamaño han quedado relegadas a un segundo plano.
+
+A partir de aquí podemos trabajar con estas 2 componentes para mostrar las relaciones entre ellas y nuestros pokemons.
+
+<h3 style="color:darkblue">Biplot</h3>
+
+Las gráficas que vemos plasman las variables en relación con las dos componentes principales. Además, la segunda añade puntos que representan la distribución de los pokemon respecto estas componentes.
+
+
+```{r}
+fviz_pca_var(pca, col.var = "contrib")
+```
+
+```{r, warning=FALSE, message=FALSE}
+fviz_pca_biplot(pca, repel = TRUE)
+```
+
+<h3 style="color:darkblue">The Scores</h3>
+
+En las gráficas relacionaremos cada uno de los pokemons con sus valores tanto en la primera como en la segunda componente además de añadir la variable capture_rate, que recordemos cuanto más baja, más díficil es de capturar ese pokemon.
+
+```{r}
+data.frame(z1=pca$x[,1],z2=pca$x[,2]) %>% 
+  ggplot(aes(z1,z2,label=pokemon_names,color=pokemon$capture_rate)) + 
+  geom_point(size=0) + 
+  labs(title="PCA", x="PC1", y="PC2") + 
+  theme_bw() + 
+  scale_color_gradient(low="darkblue", high="lightblue", name = "Capture Rate") + 
+  theme(legend.position="bottom") + 
+  geom_text(size=2, hjust=0.6, vjust=0, check_overlap = TRUE)
+```
+
+Viendolo sin etiquetas para interpretarlo mejor.
+
+```{r}
+data.frame(z1=pca$x[,1],z2=pca$x[,2]) %>% 
+  ggplot(aes(z1,z2,color=pokemon$capture_rate)) + 
+  geom_point(size=1, alpha=0.5) + 
+  labs(title="PCA", x="PC1", y="PC2") + 
+  theme_bw() + 
+  scale_color_gradient(low="darkblue", high="lightblue", name = "Capture Rate") + 
+  theme(legend.position="bottom")
+```
+
+Vemos que las observaciones tanto con valores más altos como más bajos en PC1 suelen tener valores bajos en PC2. Los pokemons que tienen valores más altos en PC2 son los que en la primera componente tenían valores en torno al 0, aunque vemos algún outlier como es normal.
+
+Podemos intentar comprobar si existe alguna relación entre el tipo de pokemon y su valor en las componentes.
+
+```{r}
+data.frame(z1=pca$x[,1],z2=pca$x[,2]) %>% 
+  ggplot(aes(z1,z2,color=pokemon_type)) + 
+  geom_point(size=1, alpha=0.5) + 
+  labs(title="PCA", x="PC1", y="PC2") + 
+  theme_bw() + 
+  scale_color_discrete(name = "Tipo") + 
+  theme(legend.position="bottom")
+```
+
+Nos es imposible distinguir si existe algun tipo de relación entre el tipo de los pokemons y su valore en PC1 y PC2, aunque podemos ver qué tipos tienen valores más altos para cada componente. Para la primera:
+
+```{r}
+data.frame(z1=pca$x[,1],type=pokemon_type) %>% group_by(type) %>% summarise(mean=mean(z1)) %>% arrange(desc(mean))
+```
+
+Vemos que el tipo dragon es el más poderoso mientras que el de tipo bug el que menos, lo cual tirando de sentido común es totalmente lógico.
+
+Para la segunda:
+
+```{r}
+data.frame(z1=pca$x[,2],type=pokemon_type) %>% group_by(type) %>% summarise(mean=mean(z1)) %>% arrange(desc(mean))
+```
+
+Esta segunda tabla sí que nos puede resultar más difícil de explicar.
+
+Ahora pasaremos a hacer comprobar si la pregunta que nos hacíamos enal rpincipio tiene una respuesta clara.
+
+**¿estaba relacionado lo fuerte que era un pokemon con lo díficil que era de capturar?**
+
+Contraponemos la primera componente a la estadística de capture_rate.
+
+```{r}
+data.frame(z1=pca$x[,1],z2=pokemon$capture_rate) %>% 
+  ggplot(aes(z1,z2,label=pokemon_names,color=pokemon_type)) + 
+  geom_point(size=2, alpha = 0.2) +
+  labs(x="PC1", y="Capture Rate") +
+  theme_bw() + 
+  theme(legend.position="bottom")
+```
+
+Vemos que efectivamente existe una clara relación negativa entre el valor del pokemon para PC1 y la variable capture_rate. Realmente, esto lo que nos indica era lo que podíamos sospechar, que cuanto más valor tiene en PC1, o lo que es lo mismo, cuanto más fuerte es, más difícil es un pokemon de capturar.
+
+Podemos intentar ver si existe alguna relación, además, con el tipo del pokemon. Sin embargo, en esta gráfica no podemos concluir nada a primera vista. Podemos intentar meter algo de jitter a los puntos a ver si distinguimos algo.
+
+```{r}
+data.frame(z1=pca$x[,1],z2=pokemon$capture_rate) %>% 
+  ggplot(aes(z1,z2,label=pokemon_names,color=pokemon_type)) + 
+  geom_jitter(size=2, alpha = 0.2, width = 0.5, height = 20) +
+  labs(x="PC1", y="Capture Rate") +
+  scale_color_discrete(name="Tipo") +
+  theme_bw() + 
+  theme(legend.position="bottom")
+```
+
+Seguimos sin poder concluir nada en relación al tipo de pokemon.
+
+Pobamos para la segunda componente.
+
+```{r}
+data.frame(z1=pca$x[,2],z2=pokemon$capture_rate) %>% 
+  ggplot(aes(z1,z2,label=pokemon_names,color=pokemon_type)) + 
+  geom_jitter(size=2, alpha = 0.2, width = 0.5, height = 20) +
+  labs(x="PC2", y="Capture Rate") +
+  scale_color_discrete(name="Tipo") +
+  theme_bw() + 
+  theme(legend.position="bottom")
+```
+
+Con PC2 no podemos decir que exista una relación clara entre el ratio de captura y el valor de PC2. Tampoco nuevamente podemos relacionar éstas con el tipo de pokemon.
+
+<h2 style="color:darkblue">Análisis Factorial</h2>
+
+Procedemos ahora a la realización del análisis factorial.
+
+Probaremos a ajustar un modelo con 4 factores sin rotaciones que usará regresión simple para estimar los scores.
+
+```{r}
+x.f.mle <- factanal(pokemon, factors = 4, rotation="none", scores="regression")
+x.f.mle
+```
+
+Tenemos en las columnas de Factor1, 2, 3 y 4 las correlaciones para cada uno de los factores.
+Con estos 4 factores explicaríamos por lo menos un 50 % exactamente, un 53%) de variabilidad.
+
+```{r}
+cbind(x.f.mle$loadings, x.f.mle$uniquenesses)
+```
+
+Vemos en la columna de errores de la derecha que nos encontramos generalmente mucho error excepto en 2 variables base_egg_steps y defense. La única otra columna con un error mediananmente aceptable sería is_legendary.
+
+Mostremos los valores de las variables en cada factor.
+
+```{r}
+par(mfrow=c(2,2), mar = c(4, 2.5, .6, 0) + 0.1)
+barplot(x.f.mle$loadings[,1], names=F, las=2, col="darkblue", ylim = c(-1, 1), space = 1)
+title("Factor1", adj = .9)
+barplot(x.f.mle$loadings[,2], names=F, las=2, col="darkblue", ylim = c(-1, 1), space = 1, axes = F)
+title("Factor2", adj = .9)
+barplot(x.f.mle$loadings[,3], names=F, las=2, col="darkblue", ylim = c(-1, 1), space = 1)
+title("Factor3", adj = .9)
+text(seq(1.5, ncol(pokemon)*2, by = 2), par("usr")[3]-0.25, 
+     srt = 30, adj = 1, xpd = TRUE, cex = .7, 
+     labels = paste(colnames(pokemon)))
+barplot(x.f.mle$loadings[,4], names=F, las=2, col="darkblue", ylim = c(-1, 1), space = 1, axes = F)
+title("Factor4", adj = .9)
+text(seq(1.5, ncol(pokemon)*2, by = 2), par("usr")[3]-0.25, 
+     srt = 30, adj = 1, xpd = TRUE, cex = .7, 
+     labels = paste(colnames(pokemon)))
+```
+
+Para la primera componente podemos ver que obtenemos una gráfica muy parecida a la que resultaba de la primera componente en PCA. Es decir, valores muy altos de base_eggs_steps e is_legendary, aunque en esta ocasión más distinguidos del resto, y valores negativos para base_happiness y capture_rate.
+
+En el segundo factor destaca por encima del resto defense, que puede ser el motivo por el cual tenga tan poco error.
+
+Del tercer y cuarto factor poco podemos decir, aunque vemos que el tercero es parecido al primero aunque dando valores algo negativos a los que destacaban en el primero, es decir, a is_legendary y base_eggs_steps.
+
+Ahora podemos usar la rotación varimax, es decir, intentando maximizar la interpretación y para el score utilizamos Bartlett que utiliza mínimos cuadrados ponderados. Por lo tanto, deberíamos obtener mejores resultados que con método anterior.
+
+```{r}
+x.f.wls <- factanal(pokemon, factors = 4, rotation="varimax", scores="Bartlett")
+x.f.wls
+```
+
+Con 4 factores tenemos exactamente el mismo porcentaje explicado de variabilidad que con el modelo factorial anterior.
+
+```{r}
+cbind(x.f.wls$loadings, x.f.wls$uniquenesses)
+```
+
+Igual que con el porcentaje de explicación de variablidad, los errores del modelo nos vuelven a quedar exactamente igual que con el modelo que utilizaba regresión simple.
+
+```{r}
+par(mfrow=c(2,2), mar = c(4, 2.5, .6, 0) + 0.1)
+barplot(x.f.wls$loadings[,1], names=F, las=2, col="darkblue", ylim = c(-1, 1), space = 1)
+title("Factor1", adj = .9)
+barplot(x.f.wls$loadings[,2], names=F, las=2, col="darkblue", ylim = c(-1, 1), space = 1, axes = F)
+title("Factor2", adj = .9)
+barplot(x.f.wls$loadings[,3], names=F, las=2, col="darkblue", ylim = c(-1, 1), space = 1)
+title("Factor3", adj = .9)
+text(seq(1.5, ncol(pokemon)*2, by = 2), par("usr")[3]-0.25, 
+     srt = 30, adj = 1, xpd = TRUE, cex = .7, 
+     labels = paste(colnames(pokemon)))
+barplot(x.f.wls$loadings[,4], names=F, las=2, col="darkblue", ylim = c(-1, 1), space = 1, axes = F)
+title("Factor4", adj = .9)
+text(seq(1.5, ncol(pokemon)*2, by = 2), par("usr")[3]-0.25, 
+     srt = 30, adj = 1, xpd = TRUE, cex = .7, 
+     labels = paste(colnames(pokemon)))
+```
+
+Los factores se parecen bastante también. Lo que más puede destacar es que en este caso donde la varaiable defense tiene más valor es en el factor 4 en lugar de en el 2, pero el resto es prácticamente igual.
+
+Podemos intentar enfrentar los dos primeros factores y mostrarlos en relación al porcentaje de captura, a ver si con factorial obtenemos resultados parecidos que con PCA.
+
+```{r}
+data.frame(z1=x.f.wls$scores[,1],z2=x.f.wls$scores[,2]) %>% 
+  ggplot(aes(z1,z2,color=pokemon$capture_rate)) + 
+  geom_point(size=1, alpha=0.5) + 
+  labs(title="Factorial", x="Factor 1", y="Factor 2") + 
+  theme_bw() + 
+  scale_color_gradient(low="darkblue", high="lightblue", name = "Capture Rate") + 
+  theme(legend.position="bottom")
+```
+
+En esta ocasión lo que visualizamos es una gran acumulación de puntos en valores cercanos al (0, 0) y algún outlier para lo que vendría a ser valores del Factor 1. No se ve una clara correlación con la variable de capture_rate.
+
+Probamos a comparar el primer Factor con el capture_rate.
+
+```{r}
+data.frame(z1=x.f.wls$scores[,1],z2=pokemon$capture_rate) %>% 
+  ggplot(aes(z1,z2,color=pokemon_type)) + 
+  geom_jitter(width = 0.3, height = 20, alpha = .4) + 
+  labs(x="Factor 1", y="Capture Rate") + 
+  theme_bw() +
+  scale_color_discrete(name = "Tipo") + 
+  theme(legend.position="bottom")
+```
+
+Vemos si que existe algo de relación entre un valor alto de Factor 1 y un valor bajo de capture_rate, sin embargo, esta relación era mucho más clara en el análisis de componentes principales.
+
+<h2 style="color:darkblue">Conclusión</h2>
+
+Por un lado y como hemos podido comprobar, las estadísticas de los pokemons se ajustan mucho mejor al análisis de Componentes Principales que al análisis Factorial ya que nuestro objetivo no es probar un modelo de factores latentes que causan variables observadas sino que, nuestras variables parecen no tener factores latentes como si puede pasar en campos como la psicología.
+
+Respecto a las preguntas que nos hemos realizado al principio sí que hemos podido ver cuales pueden llegar a considerarse los pokemons más poderosos y sí, hemos podido ver que había una clara correlación entre esta "fuerza" y la estadística que nos indicaba la dificultad que existía a la hora de capturarlos. Es decir, hemos comprobado que cuanto más fuerte, más difícil de capturar era.

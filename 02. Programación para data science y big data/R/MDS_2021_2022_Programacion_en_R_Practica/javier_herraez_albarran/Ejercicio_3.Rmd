@@ -1,0 +1,128 @@
+---
+title: "Ejericio 3"
+author: "Javier Herráez Albarrán"
+date: "20/11/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Partidos WTA de principio de siglo
+
+En este documento se realizará un breve estudio sobre partidos de tenis de la **Women's Tennis Association (WTA)** de los años 2000, 2001 y 2002. Mostraremos por lo tanto una serie de *insights* que nos ayudarán a comprender ciertos aspectos.
+
+Los datos han sido obtenidos del siguiente enlace: [WTA Matches](https://www.kaggle.com/gmadevs/wta-matches)
+
+***
+
+### 0. Preparación de datos
+Importamos librerías, cargamos datos y mostramos ciertas carcaterísticas que nos ayudarán a entender los datos.
+```{r message=FALSE}
+library(dplyr)
+wta_matches_2000 <- read.csv("wta_matches_2000.csv",
+                       sep = ",",
+                       header=T,
+                       stringsAsFactors = FALSE,
+                       dec = ".")
+wta_matches_2001 <- read.csv("wta_matches_2001.csv",
+                             sep = ",",
+                             header=T,
+                             stringsAsFactors = FALSE,
+                             dec = ".")
+wta_matches_2002 <- read.csv("wta_matches_2001.csv",
+                             sep = ",",
+                             header=T,
+                             stringsAsFactors = FALSE,
+                             dec = ".")
+wta_matches <- union_all(union_all(wta_matches_2000, wta_matches_2001), wta_matches_2002)
+
+nrow(wta_matches)
+str(wta_matches)
+summary(wta_matches)
+head(wta_matches)
+```
+Vemos que las fechas de inicio de los torneos se encuentran en formato string sin ningún tipo de separador, así que procedemos a  convertirlo en tipo Date.
+```{r}
+wta_matches$tourney_date <- as.Date(
+      gsub(" ", "", 
+        paste(substring(wta_matches$tourney_date,1 ,4), 
+              "-", 
+              substring(wta_matches$tourney_date, 5,6), 
+              "-", 
+              substring(wta_matches$tourney_date, 7,8))))
+```
+Una vez ya tenemos preparados los datos podemos comenzar a trabajar con ellos.
+
+*** 
+
+### 1. País con más victorias por superficie
+
+```{r message=FALSE}
+wta_matches %>% 
+  group_by(surface, winner_ioc) %>% 
+  summarise(n_partidos = n()) %>% 
+  filter(n_partidos == max(n_partidos))
+```
+
+Es lógico que países como España o Estados Unidos se encuentren los primeros en sus respectivas superficies ya que existe gran tradición por ellas en estos lugares. Más curioso, puede ser el caso de Australia con la hierba pues no existe ningún torneo relevante de esta superficie en el país.
+
+***
+
+### 2. Jugadoras con más finales perdidas ante una rival a priori peor
+
+```{r}
+wta_matches %>% 
+  filter(loser_rank > winner_rank, round == 'F') %>% 
+  group_by(loser_name) %>% 
+  summarise(n_finales = n()) %>% 
+  arrange(desc(n_finales))
+```
+Mostramos las jugadoras que jugando una final contra una rival con un ranking inferior han salido derrotadas en más ocasiones.
+
+***
+
+### 3. Estadísticas generales de las campeonas de Grand Slams
+
+```{r}
+wta_matches %>% 
+  filter(tourney_level == 'G', round == 'F') %>% 
+  group_by(tourney_name) %>% 
+  summarise(media_edad = mean(winner_age),
+            media_ranking = mean(winner_rank),
+            media_puntos = mean(winner_rank_points))
+```
+Podemos observar que tanto en el Australian Open como en el French Open priman más los años de experiencia de la jugadora que su puesto actual en el ranking, que podría equivaler a su estado de forma actual. Por el contrario, el US Open y Winbledon aquellas jugadoras que llegaban en un puesto mejor del ranking, tenían más posibilidades de ganarlo.
+
+***
+
+### 4. Probabilidad de que una jugadora diestra gane a una zurda
+
+```{r}
+wta_matches %>%
+  filter((winner_hand == 'R' & loser_hand == 'L') | (winner_hand == 'L' & loser_hand == 'R')) %>% 
+  mutate(n_partidos_total = n()) %>% 
+  filter(winner_hand == 'R' & loser_hand == 'L') %>% 
+  summarise(n_partidos_victoria_diestra = n(),
+            probabilidad_victoria_diestra = n_partidos_victoria_diestra/max(n_partidos_total)) %>% 
+  select(probabilidad_victoria_diestra)
+```
+Generalmente, se dice que los jugadores zurdos tienen cierta ventaja sobre aquellos que son diestros ya que estos están más acostumbrados a jugar contra otro diestro, ya que la mayoría de jugadores lo son. Sin embargo, esta estadística nos índica que el número de victoría de unos sobre otros es prácticamnete la misma.
+
+***
+
+### 5. Comparación edades en fases finales de torneos largos en verano
+
+```{r}
+wta_matches %>%
+  group_by(surface) %>% 
+  filter(draw_size >= 64,
+         strftime(tourney_date, '%m') %in% c('06','07','08'),
+         round %in% c('QF', 'SF', 'F')) %>% 
+  summarise(edad_ganadora = mean(winner_age),
+            edad_perdedora = mean(loser_age),
+            diferencia_edad_jugadoras = mean(winner_age-loser_age))  
+```
+
+En las fases finales de torneos largos (aquí hemos optado por aquellos en los que el cuadro está constituido por 64 jugadoras o más) jugados en verano con condiciones menos favorables de temperatura, lo lógico sería pensar que la edad puede ser un factor importante por el cansancio de las jugadoras. Se ve cierta diferencia entre ganadoras y perdedoras sobretodo en hierba, la cual está considerada la pista más rapida para jugar.

@@ -1,0 +1,191 @@
+---
+title: "Práctica de Estadística descriptiva"
+author: "Javier Herráez Albarrán"
+date: "11/1/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## <span style="color:#d84519"><b>Ejercicio 1</b></span>
+
+Antes de comenzar el desarrollo del ejercicio, lo primero que tendremos que hacer será importar los datos de nuestro dataset, el cual contiene variables sobre jugadores de fútbol en el videojuego FIFA22, además de importar las librerías necesarias.
+Habiendo abierto el archivo, observamos que las variables basadas en carácteres son categóricas, por lo que usaremos la propiedad ``as.is`` para indicar que la única de estas variables que no debe tratar como factor sea la del nombre del jugador.
+
+```{r warning=FALSE, message=FALSE}
+library(dplyr)
+players <- read.csv(file = "fifa22_players.csv", encoding = "UTF-8", as.is = 2)
+```
+
+#### A. Realiza un análisis descriptivo completo de los datos.
+Lo primero que haremos será ver tanto el número de observaciones del set de datos como el número y los nombres de variables.
+
+```{r}
+# Cantidad total de filas
+nrow(players)
+```
+```{r}
+# Cantidad total de columnas
+ncol(players)
+```
+```{r}
+# Nombres de columnas
+colnames(players)
+```
+
+A continuación mostraremos las primeras observaciones para hacernos una idea de cómo serán nuestros datos.
+
+```{r}
+head(players)
+```
+
+Mostraremos también el tipo de las variables y ejemplos de contenido:
+
+```{r}
+str(players)
+```
+
+También vemos un resumen estadístico de las variables.
+
+```{r}
+summary(players)
+```
+
+A destacar que la variable ContractUntiles es la única con NAs con un total de 76.
+
+Vamos a analizar si existe alguna observación repetida.
+
+```{r}
+count(players[duplicated(players),])
+```
+
+Vemos que existen 104 filas repetidas, por lo que procedemos a eliminarlas.
+
+```{r}
+players <- players[!duplicated(players),]
+```
+
+A continuación, generaremos unas gráficas relacionando cada variable con Overall, ya que es la variable más interesante y que trataremos más adelante como variable objetivo en un modelo de regresión lineal.
+
+```{r}
+
+for(i in 1:ncol(players)){
+  if(!colnames(players)[i] %in% c("Overall", "Name", "ID"))
+    {
+    plot(players[,i], players$Overall, type='p', xlab=names(players)[i], ylab="Overall")
+  }
+}
+```
+
+También, generamos un histograma para ver la distribución de Overall.
+
+```{r}
+hist(players$Overall, breaks = 20)
+```
+
+#### B. Ajusta un modelo de regresión lineal para predecir Overall usando las variables Age, NationalTeam, PreferredFoot, WageEUR, Growth, Volleys, ShootingTotal, PassingTotal, DribblingTotal, DefendingTotal y PhysicalityTotal.
+
+Ajustamos un modelo con las variables que nos pide con el siguiente resultado:
+
+```{r}
+lm_fit_overall <- lm(Overall ~ Age + NationalTeam + PreferredFoot + WageEUR + 
+                       Growth + Volleys + ShootingTotal + PassingTotal + 
+                       DribblingTotal + DefendingTotal + PhysicalityTotal, 
+                     data = players)
+summary(lm_fit_overall)
+
+```
+
+Es un modelo con un buen valor para Adjusted R-squared por lo que parece que está bastante bien como para ser utilizado. Sin embargo, viendo las gráficas que hemos mostrado en el descriptivo, creemos que podemos mejorarlo utilizando el logaritmo para la variable WageEUR.
+
+```{r}
+
+plot(log(players$WageEUR), players$Overall, type='p', xlab="log(WageEUR)", ylab="Overall")
+```
+
+Sin embargo, tenemos un problema y es que existen ciertas observaciones con valores 0, lo que hace que nos salgan valores infinitos. Por lo tanto, hacemos un estudio de estos valores a ver que podemmos hacer con ellos.
+
+```{r}
+count(players[(players$WageEUR == 0), ])
+```
+```{r}
+summary(players[(players$WageEUR == 0), ])
+```
+
+Vemos que únicamente son 76 observaciones, que además coinciden con aquellas que tenían valores NAs en ContractUntil, lo cual tiene sentido ya que serán jugadores sin contrato. Al ser tan pocas observaciones, decidimos hacer un modelo sin ellas utilizando el logaritmo de WageEUR.
+
+```{r}
+players_with_contract <- players[(players$WageEUR != 0), ]
+
+lm_fit_overall_contract <- lm(Overall ~ Age + NationalTeam + PreferredFoot + I(log(WageEUR)) + 
+                       Growth + Volleys + ShootingTotal + PassingTotal + 
+                       DribblingTotal + DefendingTotal + PhysicalityTotal, 
+                     data = players_with_contract)
+summary(lm_fit_overall_contract)
+``` 
+
+Se observa que mejora el Adjusted R-squared del anterior modelo, así que decidimos seguir trabajando con éste último.
+
+#### C. Interpreta los coeficientes del modelo y descríbelo en forma de ecuación. Calcula los intervalos de los coeficientes al 95%.
+El modelo nos quedaría por lo tanto:
+
+$$
+Overall = \\ 17.147094\\ + 0.039732\cdot Age \\ +  1.735187\cdot NationalTeamYes \\ - 0.086160\cdot PreferredFootRight \\ + 1.689883\cdot log(WageEUR) \\ - 0.104687\cdot Growth \\ + 0.016969\cdot Volleys \\ + 0.001489\cdot ShootingTotal \\ + 0.052515\cdot PassingTotal \\ + 0.252943\cdot DribblingTotal \\ + 0.059341\cdot DefendingTotal \\ + 0.182506\cdot PhysicalityTotal
+$$
+
+Y los intervalos de los coeficientes al 95%:
+
+```{r}
+confint(lm_fit_overall_contract, level = 0.95)
+``` 
+
+#### D. ¿Cuáles de los predictores tienen una relación estadísticamente significativa con la variable respuesta? En base a esto, construye un modelo reducido que sólo emplee esos predictores, y compara su bondad de ajuste con el modelo anterior.
+
+Los predictores que tienes una relación significativa con la variable respuesta son todos los utilizados a excepción de ShootingTotal y PreferredFootRight.
+
+```{r}
+lm_fit_overall_contract_reduced <- lm(Overall ~ Age + NationalTeam + I(log(WageEUR)) + 
+                       Growth + Volleys + PassingTotal + 
+                       DribblingTotal + DefendingTotal + PhysicalityTotal, 
+                     data = players_with_contract)
+summary(lm_fit_overall_contract_reduced)
+``` 
+
+Para medir la bondad del ajuste miramos el $R^2$ ajustado que en ambos modelos, tanto en el normal como en el reducido, nos sale 0.8381.
+
+#### E. Estudia la existencia de outliers o high leverage points en este último modelo.
+
+Se puede usar la función hatvalues para calcular el leverage de cada observación
+
+```{r}
+plot(hatvalues(lm_fit_overall_contract_reduced))
+``` 
+
+También, para estimar la influencia de cada observación en el modelo final se puede utilizar la distancia de Cook, que combina la magnitud del residuo y el grado de leverage.
+
+```{r}
+cooksD <- cooks.distance(lm_fit_overall_contract_reduced)
+plot(cooksD, pch=20, main="Influential Obs by Cooks Distance")
+abline(h = 4*mean(cooksD), col='red')
+``` 
+
+Nos saldrían bastantes puntos con influencia:
+
+```{r}
+length(cooksD[cooksD > 4*mean(cooksD)])
+```
+
+Los puntos con mayor influencia corresponden con los siguientes índices:
+
+```{r}
+head(sort(cooksD, decreasing = T), n = 10)
+```
+
+Que representan a los siguientes jugadores:
+
+```{r}
+head(players[order(cooksD, decreasing = T), c('ID','Name')], n = 10)
+```
+

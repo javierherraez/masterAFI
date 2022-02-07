@@ -1,0 +1,13 @@
+# Práctica de Visualización realizada por Javier Herráez Albarrán.
+
+### Contenido de la entrega:
+- Jupyter notebook con el código y storytelling.
+- Carpeta con el dataset data-police-shootings del repositorio de GitHub de The Washington Post. Contenido:
+	- 2015README
+	- README: Contiene información sobre las variables del dataset
+	- LICENSE
+	- fatal-police-shootings-data.csv
+	- Para actualizar el contenido ejecutar: git pull
+- population_usa_2019.csv
+
+- HTML con el storytelling.

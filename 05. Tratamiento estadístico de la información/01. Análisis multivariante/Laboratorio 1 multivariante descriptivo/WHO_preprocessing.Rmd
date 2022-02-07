@@ -1,0 +1,165 @@
+---
+title: "Notebook to download socio-economic data in the world"
+author: "Máster en Data Science y Big Data en Finanzas"
+date: 'AFI, 2022'
+output:
+  html_document: 
+    css: my-theme.css
+    theme: cerulean
+    highlight: tango
+    number_sections: no
+    toc: no
+    toc_depth: 1
+  pdf_document:
+    css: my-theme.css
+    theme: cerulean
+    highlight: tango
+    number_sections: yes
+    toc: yes
+    toc_depth: 1
+editor_options:
+  chunk_output_type: console
+---
+
+
+```{r global_options, include=T, echo = F}
+knitr::opts_chunk$set(echo = T, warning=FALSE, message=FALSE)
+```
+
+```{r, echo=FALSE}
+htmltools::img(src = knitr::image_uri(file.path("AfiLogo.jpg")), 
+               alt = 'logo', 
+               style = 'position:absolute; top:0; right:0; padding:10px;',
+               width="173",
+               height="77")
+```
+
+Load and prepare data from the World Health Organization (WHO) connecting through its API
+
+Here we can browse WHO data by topic:
+  https://apps.who.int/gho/data/node.main
+  
+
+```{r}
+# devtools::install_github("pierucci/rgho@devel")
+library(rgho)  #Api WHO
+library(tidyverse)
+library(countrycode)
+library(rworldmap)
+library(GGally)
+```
+
+Let's start downloading variables from WHO
+  
+```{r}
+# Create a data frame with all countries in the world
+WHO = dplyr::arrange(
+  rgho:::to_data_frame(
+    get_gho_codes(dimension = "COUNTRY")
+  ),
+  Label)
+
+# Regions:
+#  AFR  Africa
+#  AMR  Americas
+#  EMR  Eastern Mediterranean
+#  EUR  Europe
+#  SEAR South-East Asia
+#  WPR  Western Pacific
+
+WHO = WHO %>% rename(Country=Label, COUNTRY=ID)
+
+# WHOSIS_000001: Life expectancy at birth (years)
+var = get_gho_data("WHOSIS_000001") %>% mutate(LifeExpectancy=Numeric) %>%
+  group_by(COUNTRY) %>% filter(YEAR==max(YEAR,na.rm=T)) %>% arrange(SEX) %>% slice(1) %>% 
+  dplyr::select(COUNTRY, LifeExpectancy)
+WHO = merge(WHO, var, by="COUNTRY", all=T)
+dim(WHO)
+
+# MDG_0000000001: Infant mortality rate (probability of dying between birth and age 1 per 1000 live births)
+var = get_gho_data("MDG_0000000001") %>% mutate(IMR = Numeric) %>% 
+  group_by(COUNTRY) %>% filter(YEAR==max(YEAR,na.rm=T)) %>% arrange(SEX) %>% slice(1) %>% 
+  dplyr::select(COUNTRY, IMR) 
+WHO = merge(WHO, var, by="COUNTRY", all=T)
+
+# # WHS9_86: Population (in thousands) total
+# var = get_gho_data("WHS9_86") %>% mutate(Population = Numeric) %>%
+#   group_by(COUNTRY) %>% filter(YEAR==max(YEAR,na.rm=T)) %>% slice(1) %>%
+#   dplyr::select(COUNTRY, Population)
+# WHO = merge(WHO, var, by="COUNTRY", all=T)
+
+# Population is now taken from World Bank data bank, available through tidyr
+var = filter(world_bank_pop, indicator=="SP.POP.TOTL")[,c(1,20)]
+names(var) = c("COUNTRY", "Population")
+var$Population = var$Population/1000
+WHO = merge(WHO, var, by="COUNTRY", all=T)
+
+# SDGPM25 : Annual mean levels of fine particulate matter (PM2.5)
+var = get_gho_data("SDGPM25") %>% mutate(AirPollution = Numeric) %>%
+  group_by(COUNTRY) %>% filter(YEAR==max(YEAR,na.rm=T)) %>% slice(1) %>%
+  dplyr::select(COUNTRY, AirPollution)
+WHO = merge(WHO, var, by="COUNTRY", all=T)
+
+# VIOLENCE_HOMICIDERATE: Estimates of rates of homicides per 100 000 population
+var = get_gho_data("VIOLENCE_HOMICIDERATE") %>% mutate(HomicidesRate = Numeric) %>% 
+  group_by(COUNTRY) %>% filter(YEAR==max(YEAR,na.rm=T)) %>% slice(1) %>% 
+  dplyr::select(COUNTRY, HomicidesRate) 
+WHO = merge(WHO, var, by="COUNTRY", all=T)
+
+# WHS6_102: Hospital beds (per 10 000 population)
+var = get_gho_data("WHS6_102") %>% mutate(HospitalBeds = Numeric) %>% 
+  group_by(COUNTRY) %>% filter(YEAR==max(YEAR,na.rm=T)) %>% slice(1) %>% 
+  dplyr::select(COUNTRY, HospitalBeds) 
+WHO = merge(WHO, var, by="COUNTRY", all=T)
+
+# WHS7_143: Total expenditure on health as a percentage of gross domestic product
+var = get_gho_data("WHS7_143") %>% mutate(HealthExpenditure = Numeric) %>% 
+  group_by(COUNTRY) %>% filter(YEAR==max(YEAR,na.rm=T)) %>% slice(1) %>% 
+  dplyr::select(COUNTRY, HealthExpenditure) 
+WHO = merge(WHO, var, by="COUNTRY", all=T)
+
+# ITU_ICT_1: Percentage of individuals using the Internet
+var = get_gho_data("ITU_ICT_1") %>% mutate(Internet = Numeric) %>% 
+  group_by(COUNTRY) %>% filter(YEAR==max(YEAR,na.rm=T)) %>% slice(1) %>% 
+  dplyr::select(COUNTRY, Internet) 
+WHO = merge(WHO, var, by="COUNTRY", all=T)
+
+# HRH_26: Physicians density (per 1000 population)
+var = get_gho_data("HRH_26") %>% mutate(Physicians = Numeric) %>% 
+  group_by(COUNTRY) %>% filter(YEAR==max(YEAR,na.rm=T)) %>% slice(1) %>% 
+  dplyr::select(COUNTRY, Physicians) 
+WHO = merge(WHO, var, by="COUNTRY", all=T)
+
+
+# Names for Continents and Regions, and remove countries with no Region
+WHO$Continent = countrycode(WHO$Country, "country.name", destination="continent")
+WHO$Region = countrycode(WHO$Country, "country.name", destination="region")
+WHO = WHO %>% drop_na(Continent,Region)
+
+WHO = WHO %>% 
+  dplyr::select(Country,COUNTRY,Continent, Region, everything())
+```
+
+Now, we are going to merge data from The World Happiness Report (WHR) https://worldhappiness.report/ed/2020/
+
+This report ranks cities and countries based on a survey about life evaluations. 
+
+The WHR considers 6 underlying determinants for happiness: GDP per capita, healthy life expectancy, social support, perceived freedom, generosity, and perception of corruption.
+
+More information here: https://happiness-report.s3.amazonaws.com/2020/WHR20_Ch2_Statistical_Appendix.pdf
+
+```{r}
+happiness <- read.csv('WHR20_Data.csv', stringsAsFactors=T)
+names(happiness)[c(1,2,3,7,8,9,10,11,12)] = c("country", "region", "happiness", "gdp", "social_support", "life_expectancy", "perceived_freedom", "generosity", "perception_of_corruption")
+happiness = happiness[,c(1,2,3,7,8,10,11,12)]
+
+happiness$COUNTRY = countrycode(happiness$country, 'country.name', 'iso3c')
+
+df = merge(WHO, happiness, by="COUNTRY")
+```
+
+Write the file to load it later
+
+```{r}
+write.table(df, "WorldData2022.txt", sep=",")
+```

@@ -1,0 +1,411 @@
+---
+title: "Descriptive Multivariate Analysis: countries by socio-economic-health"
+author: "Máster en Data Science y Big Data en Finanzas"
+date: 'AFI, 2022'
+output:
+  html_document: 
+    css: my-theme.css
+    theme: cerulean
+    highlight: tango
+    number_sections: no
+    toc: no
+    toc_depth: 1
+  pdf_document:
+    css: my-theme.css
+    theme: cerulean
+    highlight: tango
+    number_sections: yes
+    toc: yes
+    toc_depth: 1
+editor_options:
+  chunk_output_type: console
+---
+
+
+```{r global_options, include=T, echo = F}
+knitr::opts_chunk$set(echo = T, warning=FALSE, message=FALSE)
+```
+
+```{r, echo=FALSE}
+htmltools::img(src = knitr::image_uri(file.path("AfiLogo.jpg")), 
+               alt = 'logo', 
+               style = 'position:absolute; top:0; right:0; padding:10px;',
+               width="173",
+               height="77")
+```
+
+# Motivation
+
+Can we organize the world's countries by variables we are interested in?
+
+For instance, the World Bank organizes countries in 4 income groups using just the Gross National Income (GNI) per capita
+
+But what if we are interested in health? And in much more variables?
+
+In this case study, we will analyze countries using socio-economic and health indicators that determine the overall development of the world
+
+```{r}
+library(tidyverse)
+library(countrycode)
+library(rworldmap)
+library(GGally)
+```
+
+## The dataset 
+
+The dataset is obtained through the notebook "WHO_preprocessing.Rmd", which creates a file named "WorldData2022.txt". There you can find explanation for the following World Health Organization (WHO) variables:
+
+  - Life expectancy at birth (years)
+  - Infant mortality rate (probability of dying between birth and age 1 per 1000 live births)
+  - Population (in thousands) total
+  - Ambient air pollution (Annual PM2.5 [ug/m3])
+  - Estimates of rates of homicides per 100 000 population
+  - Hospital beds (per 10 000 population)
+  - Total expenditure on health as a percentage of gross domestic product
+  - Percentage of individuals using the Internet
+  - Physicians density (per 1000 population)
+  
+and also from the following The World Happiness Report (WHR) variables:
+
+  - Happiness
+  - GDP per capita
+  - Healthy life expectancy
+  - Social support
+  - Perceived freedom
+  - Generosity
+  - Perception of corruption
+
+```{r}
+WHO = read.table("WorldData2022.txt", sep=",")  
+```
+
+## Descriptive analysis
+
+  
+```{r}
+dim(WHO)
+str(WHO)
+head(WHO)
+tail(WHO)
+summary(WHO)
+```
+
+Out of the 200 countries in the world, we have almost complete information (20 variables) for 151 countries: 
+
+  - Diverse variables (socio-economic and health)
+
+  - Just a few missing values
+  
+One country is duplicated:
+
+```{r}
+WHO$Country[duplicated(WHO$Country)]
+WHO = WHO[-33,]
+```
+
+The output of the tools depend directly on the selected variables for the input. This selection is subjective and depends on the application's objective
+
+```{r}
+X = WHO %>% dplyr::select(-Continent,-Region,-Country, -COUNTRY,-region,-country,-Population) 
+```
+  
+Take care: we are going to omit rows with NAs
+
+```{r}
+dim(WHO)[1]
+dim(na.omit(X))[1]
+
+id.complete = complete.cases(X)
+names = WHO$Country[id.complete]
+continent = WHO$Continent[id.complete]
+population = WHO$Population[id.complete]
+
+X = X[id.complete,]
+row.names(X)=names
+```
+  
+# Basic Data Analysis
+
+Tables
+
+```{r}
+table(WHO$Continent)
+```
+
+Better with a barplot:
+
+```{r}
+WHO %>% ggplot(aes(x=reorder(Continent, Continent, length))) +geom_bar(aes(fill=Continent)) + 
+  labs(caption="Countries per continent",
+       x = "", y = "")+ theme(legend.position="none")
+```
+  
+Basic maps:
+
+```{r}
+# select your favourite variable here:
+map = WHO %>% dplyr::select(Country, LifeExpectancy)
+
+#Convert the country code into iso3c using the function countrycode()
+map$country = countrycode(map$Country, 'country.name', 'iso3c')
+
+#Create data object supporting the map
+matched <- joinCountryData2Map(map, joinCode = "ISO3",
+                               nameJoinColumn = "country")
+#Draw the map
+mapCountryData(matched,nameColumnToPlot="LifeExpectancy",missingCountryCol = "white",
+               borderCol = "#C7D9FF",
+               catMethod = "pretty", colourPalette = "topo",
+               mapTitle = c("Life Expectancy by Country"), lwd=1)
+```
+
+Which is the country with the lowest young population?
+
+And the country with the highest senior population? Are they the same?
+  
+# Basic descriptive measures 
+
+Enter here the vector of means
+
+```{r}
+xbar = colMeans(X)  
+xbar
+```
+
+Enter here the covariance matrix
+
+```{r}
+S = cov(X)   
+S
+```
+
+Enter here the correlation matrix
+
+```{r}
+R = cor(X)  
+R
+```
+
+heterogeneous data units:
+
+```{r}
+det(S)
+sum(diag(S))
+```
+
+highly correlated data:
+
+```{r}
+det(R)
+sum(diag(R))
+```
+
+## Relations in dimension 1
+
+Univariate analysis for all p=14 variables
+
+```{r}
+boxplot(X, col="blue", las=2)
+```
+
+Scale or not to scale?
+
+```{r}
+boxplot(scale(X), las=2, col="darkblue")
+```
+
+## Relations in dimension 2
+
+Bivariate analysis (scatter plots), in total 78
+
+Multiple scatter plot: all relations, 78, in dimension 2
+
+```{r}
+ggcorr(X, label = T)
+```
+
+Insights?
+
+For instance, happiness is highly correlated with GDP, social support, and population using internet. And negatively correlated with infant mortality rate
+
+## Relations in dimension 3
+
+In total 286
+
+In general, no way to obtain information...
+
+But sometimes we can...
+
+For instance, this is 4D using a scatterplot (2D)
+
+```{r}
+ggplot(WHO, aes(x=HealthExpenditure, y=LifeExpectancy, group=Continent, size=Population, color=happiness)) + 
+  geom_point(alpha=0.9) + geom_smooth(method=lm,se=F, size=0.3) +
+  facet_wrap(~ Continent) +
+  scale_color_gradient(low="red", high="green") +
+  theme_minimal()+ theme(legend.position="none") + 
+  labs(title = "World countries: life expectancy vs health expenditure", subtitle="(color denotes happiness, size denotes population)",caption="Source: World Health Organization",
+       x = "Expenditure on health (percentage of GDP)", y = "Life expectancy at birth (in years)")
+
+```
+
+Is wealth a determinant of happiness?
+
+```{r}
+WHO %>% ggplot(aes(x=gdp, y=happiness, group=Continent, size=Population, color=region)) + 
+  geom_point(alpha=0.75) + geom_smooth(method=lm,se=F, size=0.3) +
+  facet_wrap(~ Continent) +
+  theme_minimal()+ theme(legend.position="none") + 
+  labs(title = "Happiness vs wealth by continent", subtitle="(size denotes population, color denotes region)",caption="Source: World Happiness Report",
+       x = "GDP (log)", y = "Happiness Score")
+```
+
+
+# Multivariate standardization
+
+This is very useful to compute distances considering correlations: Mahalanobis distance
+
+```{r}
+S_x <- cov(X)
+iS <- solve(S_x)
+e <- eigen(iS)
+V <- e$vectors
+B <- V %*% diag(sqrt(e$values)) %*% t(V)
+Xtil <- scale(X,scale = FALSE)
+X.S <- Xtil %*% B
+```
+
+Mahalanobis distances between each country and the world's center:
+
+```{r}
+muhat = colMeans(X)
+dM2 <- mahalanobis(X,muhat,S)  # Mahalanobis distances (square)
+dM2
+
+plot(sort(dM2,index.return=TRUE)$x,pch=19,col=grey.colors(n=length(dM2),start=0,end=.75),xlab="",ylab="",main="Mahalanobis distances (square)")
+
+sort(dM2)
+```
+
+Closest countries to Spain:
+
+```{r}
+dM2 <- mahalanobis(X,t(X["Spain",]),S)
+head(sort(dM2))
+```
+
+# Motivation to PCA
+
+What is the happiest country?
+
+What is the country with the highest life expectancy? Is it the same?
+
+What is the country with the lowest IMR?
+
+Can we rank the countries considering all the variables at the same time?
+
+## From dimension X to dimension 2
+
+```{r}
+pca = prcomp(X, scale=T)
+summary(pca)
+```
+
+With 2 components we explain 63% of variability
+
+```{r}
+library(factoextra)
+
+fviz_screeplot(pca, addlabels = TRUE)
+```
+
+First component?
+
+```{r}
+barplot(pca$rotation[,1], las=2, col="darkblue")
+```
+
+It is a measure of global development (positive loads on good indicators and negative ones on the bad variables)
+
+The most important indicators are: Internet, gdp, LifeExpectancy, IMR, happiness, etc.
+
+Note the sum of the squared loadings (eigenvectors) is equal to 1
+
+```{r}
+sum(pca$rotation[,1]^2)
+```
+
+That means squared loadings are easier to interpret than the loadings
+
+I.e. they are like percentages (numbers between 0 and 1), but we loose the sign
+
+Let's plot squared loadings instead. 
+
+They are called contribution of variables to components
+
+```{r}
+fviz_contrib(pca, choice = "var", axes = 1)
+```
+
+The red dashed line on the graph above indicates the expected average contribution 
+
+If the contribution of the variables were uniform, the expected value would be 1/length(variables) = 1/14 = 7%
+
+## Rank the countries by the first component (scores)
+
+```{r}
+names[order(pca$x[,1])][1:10]
+names[order(pca$x[,1], decreasing=T)][1:10]
+```
+
+Second component?
+
+```{r}
+barplot(pca$rotation[,2], las=2, col="darkblue")
+```
+
+Contribution of variables to second component
+
+```{r}
+fviz_contrib(pca, choice = "var", axes = 2)
+```
+
+# Plot the first two scores
+
+```{r}
+data.frame(z1=pca$x[,1],z2=pca$x[,2]) %>% 
+  ggplot(aes(z1,z2,label=names,color=continent)) + geom_point(size=0) +
+  labs(title="First two principal components (scores)", x="PC1", y="PC2") + #guides(color=guide_legend(title="HDI"))+
+  theme_bw() +theme(legend.position="bottom") + geom_text(size=3, hjust=0.6, vjust=0, check_overlap = TRUE) 
+# The two first PCs seem independent
+
+```
+
+Conclusions?
+
+Map:
+
+```{r}
+# Map our PCA index in a map:
+map = data.frame(country=names, value=pca$x[,1])
+#Convert the country code into iso3c using the function countrycode()
+map$country = countrycode(map$country, 'country.name', 'iso3c')
+#Create data object supporting the map
+matched <- joinCountryData2Map(map, joinCode = "ISO3",
+                               nameJoinColumn = "country")
+#Draw the map
+mapCountryData(matched,nameColumnToPlot="value",missingCountryCol = "white",
+               addLegend = FALSE, borderCol = "#C7D9FF",
+               catMethod = "pretty", colourPalette = "terrain",
+               mapTitle = c("PCA1 by Country"), lwd=1)
+
+# zoom in Africa
+mapCountryData(matched, nameColumnToPlot="value", ,missingCountryCol = "white",
+               addLegend = FALSE, borderCol = "#C7D9FF",
+               mapRegion = "Africa", mapTitle = c("PCA1 by Country"), lwd=1, 
+               catMethod = "quantile", colourPalette = "terrain")
+
+
+
+```
+

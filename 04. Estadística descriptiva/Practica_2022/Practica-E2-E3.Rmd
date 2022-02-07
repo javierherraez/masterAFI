@@ -1,0 +1,390 @@
+---
+title: "Práctica de Estadística descriptiva"
+author: "Javier Herráez Albarrán"
+date: "15/1/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## <span style="color:#d84519"><b>Ejercicio 2</b></span>
+
+En este ejercicio usaremos el dataset de BostonHousing con datos de viviendas en Boston. Las variables que contiene el dataset son las siguientes:
+ 
+- **crim:**	per capita crime rate by town
+- **zn:**	proportion of residential land zoned for lots over 25,000 sq.ft
+- **indus:**	proportion of non-retail business acres per town
+- **chas:**	Charles River dummy variable (= 1 if tract bounds river; 0 otherwise)
+- **nox:**	nitric oxides concentration (parts per 10 million)
+- **rm:**	average number of rooms per dwelling
+- **age:**	proportion of owner-occupied units built prior to 1940
+- **dis:**	weighted distances to five Boston employment centres
+- **rad:**	index of accessibility to radial highways
+- **tax:**	full-value property-tax rate per USD 10,000
+- **ptratio:**	pupil-teacher ratio by town
+- **b:**	1000(B - 0.63)^2 where B is the proportion of blacks by town
+- **lstat:**	percentage of lower status of the population
+- **medv:**	median value of owner-occupied homes in USD 1000's
+
+```{r warning=FALSE, message=FALSE}
+library(mlbench)
+library(dplyr)
+library(GGally) # ggplot2-based visualization of correlations
+library(leaps)
+library(lmtest)
+library(regclass)
+library(nortest)
+library(car)
+library(caret)
+```
+
+#### A. Realiza un análisis descriptivo completo de los datos.
+
+Lo primero que haremos será analizar la forma de nuestro dataset, es decir, el número de observaciones y variables, además de los nombres de éstas.
+
+```{r}
+data(BostonHousing)
+```
+```{r}
+# Cantidad total de filas
+nrow(BostonHousing)
+```
+```{r}
+# Cantidad total de columnas
+ncol(BostonHousing)
+```
+```{r}
+# Nombres de columnas
+colnames(BostonHousing)
+```
+
+Echamos un vistazo a las primeras filas del dataset para hacernos una idea de su contenido.
+
+```{r}
+head(BostonHousing)
+```
+
+Analizamos las clases de nuestras variables, así como algunos de sus valores.
+
+```{r}
+str(BostonHousing)
+```
+
+Ejecutamos un summary para observar la información estadística de nuestro dataset.
+
+```{r}
+summary(BostonHousing)
+```
+
+Buscamos si existe alguna fila repetida para eleimirla en tal caso.
+
+```{r}
+count(BostonHousing[duplicated(BostonHousing),])
+```
+
+No existe ninguna fila repetida.
+
+El siguiente paso será realizar gráficos para ver la relación entre las distintas variables y medv, que es la variable que nos interesa.
+
+```{r}
+for(i in 1:ncol(BostonHousing)){
+  if(colnames(BostonHousing)[i] != "medv"){
+    plot(BostonHousing[,i], BostonHousing$medv, type='p', xlab=names(BostonHousing)[i], ylab="medv")
+  }
+}
+```
+
+Además, dibujaremos un histograma para ver la distribución de medv.
+
+```{r}
+hist(BostonHousing$medv, breaks = 20)
+```
+
+Por último, veremos la matriz de correlación entre todas las variables (a excepción de chas que es un factor)
+
+```{r warning=FALSE}
+ggcorr(BostonHousing, label = TRUE)
+```
+
+#### B. Construye un modelo de regresión lineal que permite predecir medv (debes realizar el análisis completo: desde un modelo inicial hasta el ajuste del modelo final y la presentación de resultados, pasando por los diferentes pasos que te permitan optimizar tu primer modelo, así como comprobar si verifican o no las hipótesis en las que se fundamentan los modelos de regresión lineal).
+
+Lo primero que haremos será probar *best subset selection* para construir el modelo.
+
+```{r}
+model <- regsubsets(medv ~ . , data = BostonHousing, nvmax = ncol(BostonHousing))
+model_sumary <- summary(model)
+model_sumary
+```
+
+Veremos una serie de estadísticos para ver el error de predicción en función de las variables utilizadas en el modelo. Los estadíosticos serán: 
+
+- $R^2$
+
+```{r}
+# R2
+plot(model_sumary$rsq, xlab = "Numero de variables", ylab = "R2", type = "b")
+text(model_sumary$rsq,
+     labels = round(model_sumary$rsq, 4),
+     cex = 0.6, pos = 4, col = "red")
+```
+
+- $R^2 ajusted$
+
+```{r}
+# R2 ajustado
+plot(model_sumary$adjr2, xlab = "Numero de variables", ylab = "R2 ajustado", type = "b")
+text(model_sumary$adjr2,
+     labels = round(model_sumary$adjr2, 4),
+     cex = 0.6, pos = 4, col = "red")
+```
+
+- *Criterio de información Bayesiana (BIC)*
+
+```{r}
+# BIC
+plot(model_sumary$bic, xlab = "Numero de variables", ylab = "BIC", type = "b")
+text(model_sumary$bic,
+     labels = round(model_sumary$bic, 4),
+     cex = 0.6, pos = 4, col = "red")
+```
+
+- *Estadístico* $C_{p}$ *de Mallows:*
+
+```{r}
+# Cp Mallows
+plot(model_sumary$cp, xlab = "Numero de variables", ylab = "Cp", type = "b")
+text(model_sumary$cp,
+     labels = round(model_sumary$cp, 4),
+     cex = 0.6, pos = 4, col = "red")
+```
+
+- *Criterio de información de Akaike (AIC):*
+
+```{r}
+# AIC
+n <- nrow(BostonHousing)
+p <- apply(model_sumary$which, 1, sum)
+aic <- model_sumary$bic - log(n) * p + 2 * p
+plot(aic, xlab = "Numero de variables", ylab = "AIC", type = "b")
+text(aic,
+     labels = round(aic, 4),
+     cex = 0.6, pos = 4, col = "red")
+```
+
+Por el criterio del codo elegimos probar con11 variables aunque parezcan bastantes. Procedemos entonces a ajustar un modelo con las variables seleccionadas.
+
+```{r}
+lm_medv <- lm(medv ~ crim + zn + chas + nox + rm + dis + rad + tax + ptratio + b + lstat, data = BostonHousing)
+summary(lm_medv)
+
+```
+
+Vemos que todas las variables parecen tener una relación significativa con la variable respuesta aunque el $R^2 ajusted$ del modelo podría ser mejor.
+
+Representamos los residuos del modelo.
+
+```{r}
+plot(BostonHousing$medv, lm_medv$residuals, xlab='medv', ylab='residuals')
+```
+```{r}
+boxplot(lm_medv$residuals)
+```
+
+Excepto por la gran cantidad de outliers en valores altos de medv, el diagrama de residuos es el esperado.
+
+A la hora de dibujar las variables enfrentadas con medv, hemos podido ver que la variable lstat parece que tenía una correlación negativa con medv. Podemos utilizar su inversa en el modelo y ver su resultado.
+
+```{r}
+plot(1/BostonHousing$lstat, BostonHousing$medv, type='p', xlab="1/lstat", ylab="medv")
+```
+```{r}
+lm_medv_inv_lstat <- update(lm_medv, . ~ . + I(1/lstat))
+summary(lm_medv_inv_lstat)
+```
+
+Vemos que el valor del $R^2 ajusted$ mejora notablemente, aunque vemos que en este modelo hay un par de variables que pierden relación con la variable objetivo, por lo que procedemos a eliminarlas del modelo.
+
+```{r}
+lm_medv_inv_lstat <- update(lm_medv_inv_lstat, . ~ . - zn - chas)
+summary(lm_medv_inv_lstat)
+```
+
+Podemos observar que el $R^2 ajusted$ disminuye prácticamente nada y que ahora todas las variables están bien relacionadas con la variable objetivo.
+
+Pasamos a ver los residuos.
+
+```{r}
+plot(BostonHousing$medv, lm_medv_inv_lstat$residuals, xlab='medv', ylab='residuals')
+```
+
+Vemos que la distribución de los residuos apenas ha cambiado respecto al modelo original, aunque los outliers han dejado de concentrarse.
+
+Procedemos ahora a ver el leverage de los puntos.
+
+```{r}
+plot(hatvalues(lm_medv_inv_lstat))
+```
+
+También lo podemos observar con la distancia de Cook.
+
+```{r}
+cooksD <- cooks.distance(lm_medv_inv_lstat)
+plot(cooksD, pch=20, main="Influential Obs by Cooks Distance")
+abline(h = 4*mean(cooksD), col='red')
+```
+
+También, estudiaremos la colinealidad.
+
+```{r}
+VIF(lm_medv_inv_lstat)
+```
+
+Observamos que hay ciertos valores algo sospechosos de colinealidad por lo que procedemos a eliminar uno de ellos. Además, eliminaremos también lstat ya que tenemos su inversa que tiene una relación más significativa con medv.
+
+```{r}
+lm_medv_candidate <- update(lm_medv_inv_lstat, . ~ . - tax - lstat)
+summary(lm_medv_candidate)
+```
+```{r}
+VIF(lm_medv_candidate)
+```
+
+Con este modelo obtenemos que el  $R^2 ajusted$ ha disminuido aunque muy poco pero ahora no tenemos variables con posible correlación. Parece que tenemos un modelo con el que trabajar.
+
+Veamos sus gráficas. 
+
+```{r}
+crPlots(lm_medv_candidate)
+```
+```{r}
+plot(lm_medv_candidate)
+```
+
+Vamos a comprobar las hipótesis.
+
+Primero estudiaremos si existe relación lineal entre las variables.
+
+```{r}
+raintest(lm_medv_candidate)
+```
+
+Vemos que el p-valor es demasiado grande como para suponer la existencia de relación lineal entre la variable
+target y las explicativas. Vemos que ocurre con los otrros modelos probados.
+
+```{r}
+raintest(lm_medv)
+```
+```{r}
+raintest(lm_medv_inv_lstat)
+```
+
+En ambos obtenemos un p-valor incluso mayor. Deberíamos plantearnos entonces si un modelo de regresión lineal es la mejor opción para nuestro conjunto de datos.
+
+Probamos el resto de test empezando por comprobar si los residuos tienen media nula.
+
+```{r}
+t.test(lm_medv_candidate$residuals)
+```
+
+Podemos afirmar que la media de los residuos es nula, ya que el p-valor es igual a 1.
+
+Para ver la existencia de homocedasticidad utilizamos el test de Breusch-Pagan.
+
+```{r}
+bptest(lm_medv_candidate)
+```
+
+El p-valor es demasiado pequeño por lo que rechazamos la homocedasticidad del modelo.
+
+Para estudiar si los residuos tienen autocorrelación nula utilizamos el Durbin-Watson test.
+
+```{r}
+dwtest(lm_medv_candidate)
+```
+
+El p-valor es pequeño, entonces decimos que nuestros errores no son independientes.
+
+Por último para estudiar la normalidad de los errores utilizamos los test de Shapiro-Wilk y de Anderson-Darling.
+
+```{r}
+shapiro.test(lm_medv_candidate$residuals)
+```
+```{r}
+ad.test(lm_medv_candidate$residuals)
+```
+
+En ambos, el p-valor es muy pequeño por lo que podemos decir que no nos encontramos con errores distribuidos de forma normal.
+
+
+## <span style="color:#d84519"><b>Ejercicio 3</b></span>
+
+#### En la construcción del modelo del ejercicio anterior habrás pasado por varios modelos intermedios. Considera el modelo final y un par de esos modelos intermedios y, mediante leave-one-out cross-validation y 10-fold cross-validation, estima su capacidad predictiva en situaciones reales y justifica si tu elección en el ejercicio anterior ha sido acertada o no.
+ 
+### Leave-one-out cross-validation
+
+```{r}
+err_lm_medv <- c()
+err_lm_medv_inv_lstat <- c()
+err_lm_medv_candidate <- c()
+
+for(i in 1:nrow(BostonHousing)){
+  lm_medv.LOOCV <- update(lm_medv, data = BostonHousing[-i,])
+  lm_medv_inv_lstat.LOOCV <- update(lm_medv_inv_lstat, data = BostonHousing[-i,])
+  lm_medv_candidate.LOOCV <- update(lm_medv_candidate, data = BostonHousing[-i,])
+  err_lm_medv <- c(err_lm_medv, (BostonHousing$medv[i] - predict(lm_medv.LOOCV, BostonHousing[i,]))**2)
+  err_lm_medv_inv_lstat <- c(err_lm_medv_inv_lstat,  (BostonHousing$medv[i] - predict(lm_medv_inv_lstat.LOOCV, BostonHousing[i,]))**2)
+  err_lm_medv_candidate <- c(err_lm_medv_candidate,  (BostonHousing$medv[i] - predict(lm_medv_candidate.LOOCV, BostonHousing[i,]))**2)        
+}
+mean(err_lm_medv)
+mean(err_lm_medv_inv_lstat)
+mean(err_lm_medv_candidate)
+
+```
+
+Calculamos para todas las observaciones el MSE y estimamos el error del test mediante su media.
+
+Podemos observar que la media del error cuadrático medio es menor en el segundo modelo, el *lm_medv_inv_lstat*, aunque bastante cercano al último, el *lm_medv_candidate*.
+
+### 10-fold cross-validation
+
+```{r}
+fold_index_list <- createFolds(BostonHousing$medv, k = 10)
+
+mat <- matrix(nrow = 0, ncol = 6)
+colnames(mat) <- c('mse_train_lm_medv', 'mse_test_lm_medv', 'mse_train_lm_medv_inv_lstat', 'mse_test_lm_medv_inv_lstat', 
+                   'mse_train_lm_medv_candidate', 'mse_test_lm_medv_candidate')
+for(fold in fold_index_list){  
+  training_data <- BostonHousing[-fold, ]
+  test_data <- BostonHousing[fold, ]
+  lm_medv.10_fold_CV <- update(lm_medv, data = training_data)
+  lm_medv_inv_lstat.10_fold_CV <- update(lm_medv_inv_lstat, data = training_data)
+  lm_medv_candidate.10_fold_CV <- update(lm_medv_candidate, data = training_data)
+  mse_train_lm_medv <- mean((lm_medv.10_fold_CV$residuals)**2)
+  mse_train_lm_medv_inv_lstat <- mean((lm_medv_inv_lstat.10_fold_CV$residuals)**2)
+  mse_train_lm_medv_candidate <- mean((lm_medv_candidate.10_fold_CV$residuals)**2)
+  mse_test_lm_medv <- mean((test_data$medv - predict(lm_medv.10_fold_CV, test_data))**2)
+  mse_test_lm_medv_inv_lstat <- mean((test_data$medv - predict(lm_medv_inv_lstat.10_fold_CV, test_data))**2)
+  mse_test_lm_medv_candidate <- mean((test_data$medv - predict(lm_medv_candidate.10_fold_CV, test_data))**2)
+  mat <- rbind(mat, c(mse_train_lm_medv,
+                      mse_test_lm_medv,
+                      mse_train_lm_medv_inv_lstat,
+                      mse_test_lm_medv_inv_lstat,
+                      mse_train_lm_medv_candidate,
+                      mse_test_lm_medv_candidate))
+}
+
+mat <- as.data.frame(mat)
+colMeans(mat)
+```
+
+Para cada fold se ha estimado el error cuadrático medio y con todos ellos se calcula su media para estimar el error del test.
+
+Volvemos a ver que el segundo modelo vuelve a tener un MSE más bajo que el resto, aunque otra vez cercano al del último modelo.
+
+Podemos concluir entonces que hemos elegido bien el modelo ya que los errores que obtenemos son bastantes similares a la vez que nos libramos de los posibles problemas de correlación que teníamos en el segundo modelo.
+
+
+
+
