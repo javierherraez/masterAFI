@@ -29,30 +29,40 @@ draw_dygraph <- function(team_filtre){
             dySeries("rebounds", color="#984ea3", label = "Rebotes", strokeWidth = 3) %>%
             dySeries("steals", color="#ff7f00", label = "Robos", strokeWidth = 3) %>%
             dySeries("turnovers", color="#ffd92f", label = "Perdidas", strokeWidth = 3) %>% 
-            dySeries("n_games", strokePattern="dotted", color="#a65628", label = "Partidos", strokeWidth = 3)%>% 
+            dySeries("n_games", strokePattern="dotted", color="#a65628", label = "Nº Partidos", strokeWidth = 3)%>% 
             dyLegend(labelsDiv = "legenddygraph"))
 }
 
-draw_map <- function(){
-  # ees %>% filter(var_sexo %in% input$sexos) %>%
-  #   filter(var_tipocontrato %in% input$contratos) %>%
-  #   group_by(var_provincia) %>%
-  #   summarise(salario = sum(salario_bruto_anual_medio*factor_elev)/sum(factor_elev)) -> map_df
-  # 
-  # pal <- colorNumeric('Greens', map_df$salario)
-  # geojson$features <- lapply(geojson$features, function(feat){
-  #   provincia <- as.numeric(feat$properties$id)
-  #   feat$properties$style <- list(fillColor = pal(map_df$salario[map_df$var_provincia == provincia]))
-  #   feat$properties$popup <- paste0('<b>Provincia:</b> ', feat$properties$description,
-  #                                   '<br><b>Salario medio:</b> ',
-  #                                   round(map_df$salario[map_df$var_provincia == provincia]))
-  #   return(feat)
-  # })
+draw_map <- function(positions){
+  map_df <- nba_df %>% 
+    filter(grepl(paste(positions, collapse="|"), player_position)) %>% 
+    group_by(team_name) %>%
+    summarise(salary = sum(salary, na.rm = T) / n_distinct(id))
+
+  pal <- colorNumeric('Reds', map_df$salary)
+  
+  geojson$features <- lapply(geojson$features, function(feat){
+    feat$properties$style <- list(fillColor = pal(map_df$salary[map_df$team_name == feat$properties$team]))
+    feat$properties$popup <- paste('<b>Equipo:</b>', 
+                                   feat$properties$cit, feat$properties$team,
+                                   '<br><b>Salario medio:</b>',
+                                   round(map_df$salary[map_df$team_name == feat$properties$team]), "$")
+    return(feat)
+  })
   
   return (leaflet() %>% 
-            # setView(lng = -3.68, lat = 40.43, zoom = 5) %>%
+            setView(lng = -102, lat = 38, zoom = 4) %>%
             addTiles(urlTemplate = 'http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png') %>%
-            addGeoJSON(geojson)# %>% 
-            #addLegend("bottomright", pal = pal, values = map_df$salario,title = "Salario",opacity = 1)
+            addGeoJSON(geojson) %>% 
+            addCircleMarkers(
+              lng = sapply(geojson$features, function(feat) {
+                return(feat$geometr$coordinates[[1]])
+              }),
+              lat = sapply(geojson$features, function(feat) {
+                return(feat$geometr$coordinates[[2]])
+              }),
+              #color = ~pal(map_df$salary)
+            ) %>% 
+            leaflet::addLegend("bottomright", pal = pal, values = map_df$salary, title = "Salario",opacity = 1)
             )
 }

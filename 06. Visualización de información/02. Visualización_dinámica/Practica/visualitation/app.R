@@ -7,11 +7,20 @@ library(jsonlite)
 library(dygraphs)
 source("functions.R")
 
+# setwd("ASIGNATURAS MASTER/06. Visualización de información/02. Visualización_dinámica/Practica/visualitation/")
+
 nba_df = read.csv("../data/nba2020.csv")
 nba_df$date <- as.Date(nba_df$date)
 geojson <- readLines('arenas.geojson', warn = FALSE, encoding = 'utf-8') %>%
   paste(collapse = '\n') %>%
   fromJSON(simplifyVector = FALSE)
+
+geojson$style = list(
+  weight = 1,
+  opacity = 1,
+  fillOpacity = 0.3,
+  color = 'red'
+)
 
 # Interface
 
@@ -50,14 +59,12 @@ ui <- dashboardPage(
       tabItem(tabName = 'Map',
               fluidRow(
                 column(width = 4,
-                       wellPanel(checkboxGroupInput(inputId = 'sexos',
-                                                    label = 'Sexo',
-                                                    choices = c('Hombres' = 'hombre', 'Mujeres' = 'mujer'),
-                                                    selected = c('hombre', 'mujer'))),
-                       wellPanel(checkboxGroupInput(inputId = 'contratos',
-                                                    label = 'Tipo de contrato',
-                                                    choices = c('Indefinido', 'Temporal'),
-                                                    selected = c('Indefinido', 'Temporal')))
+                       wellPanel(checkboxGroupInput(inputId = 'position_map',
+                                                    label = 'Posición',
+                                                    choices = c('Center' = 'C', 
+                                                                'Foward' = 'F',
+                                                                'Guard' = 'G'),
+                                                    selected = c('C')))
                 ),
                 column(width = 6,
                        leafletOutput(outputId = 'mapa'))
@@ -75,7 +82,7 @@ server <- function(input, output){
   })
   
   output$mapa <- renderLeaflet({
-    draw_map()
+    draw_map(input$position_map)
   })
 }
 
