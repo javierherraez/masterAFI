@@ -5,13 +5,13 @@ library(dplyr)
 library(leaflet)
 library(jsonlite)
 library(dygraphs)
-source("functions.R")
+# setwd('ASIGNATURAS MASTER/06. Visualización de información/02. Visualización_dinámica/Practica/visualitation/')
+setwd('C:/Users/jherraez/Documents/masterAFI/06. Visualización de información/02. Visualización_dinámica/Practica/visualitation')
+source('functions.R')
 
-# setwd("ASIGNATURAS MASTER/06. Visualización de información/02. Visualización_dinámica/Practica/visualitation/")
-
-nba_df = read.csv("../data/nba2020.csv")
+nba_df = read.csv('../data/nba2020.csv')
 nba_df$date <- as.Date(nba_df$date)
-geojson <- readLines('arenas.geojson', warn = FALSE, encoding = 'utf-8') %>%
+geojson <- readLines('../data/arenas.geojson', warn = FALSE, encoding = 'utf-8') %>%
   paste(collapse = '\n') %>%
   fromJSON(simplifyVector = FALSE)
 
@@ -27,7 +27,7 @@ geojson$style = list(
 ui <- dashboardPage(
   skin = 'blue',
   dashboardHeader(
-    title = "NBA 2020 - 2021",
+    title = 'NBA 2020 - 2021',
     titleWidth = 300
   ),
   dashboardSidebar(
@@ -37,22 +37,22 @@ ui <- dashboardPage(
     ),
     width = 300),
   dashboardBody(
-    includeCSS("custom.css"),
+    includeCSS('custom.css'),
     tabItems(
       tabItem(tabName = 'Temporal',
               fluidRow(
-                column(12, h2("Estadísticas promedio semanales", style="color:#3C8DBC"))
+                column(12, h2('Estadísticas promedio semanales', style='color:#3C8DBC'))
               ),
               fluidRow(
                 column(width = 3,
                        wellPanel(selectInput(inputId = 'team_weekly',
                                              label = 'Equipo',
-                                             choices = c("TODOS", unique(nba_df$team_name)),
+                                             choices = c('TODOS', unique(nba_df$team_name)),
                                              multiple = FALSE))
                 ),
                 column(width = 9,
-                       box(dygraphOutput("dygraph"), width=12),
-                       box(textOutput("legenddygraph"), width=12)
+                       box(dygraphOutput('dygraph'), width=12),
+                       box(textOutput('legenddygraph'), width=12)
                 )
               )
       ),
@@ -64,7 +64,7 @@ ui <- dashboardPage(
                                                     choices = c('Center' = 'C', 
                                                                 'Foward' = 'F',
                                                                 'Guard' = 'G'),
-                                                    selected = c('C')))
+                                                    selected = 'C'))
                 ),
                 column(width = 6,
                        leafletOutput(outputId = 'mapa'))
@@ -76,13 +76,19 @@ ui <- dashboardPage(
 
 # Server
 
-server <- function(input, output){
+server <- function(input, output, session){
   output$dygraph <- renderDygraph({
     draw_dygraph(input$team_weekly)
   })
   
   output$mapa <- renderLeaflet({
     draw_map(input$position_map)
+  })
+  
+  observe({
+    if(length(input$position_map) < 1){
+      updateCheckboxGroupInput(session, 'position_map', selected= 'C')
+    }
   })
 }
 

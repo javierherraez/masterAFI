@@ -1,7 +1,7 @@
 library(xts)
+
 draw_dygraph <- function(team_filtre){
   stats_date <- nba_df
-  
   if(team_filtre != "TODOS"){
     stats_date <- stats_date %>%
       filter(team_name == team_filtre)
@@ -34,6 +34,7 @@ draw_dygraph <- function(team_filtre){
 }
 
 draw_map <- function(positions){
+  # positions = c("F")
   map_df <- nba_df %>% 
     filter(grepl(paste(positions, collapse="|"), player_position)) %>% 
     group_by(team_name) %>%
@@ -43,10 +44,11 @@ draw_map <- function(positions){
   
   geojson$features <- lapply(geojson$features, function(feat){
     feat$properties$style <- list(fillColor = pal(map_df$salary[map_df$team_name == feat$properties$team]))
-    feat$properties$popup <- paste('<b>Equipo:</b>', 
-                                   feat$properties$cit, feat$properties$team,
+    feat$properties$popup <- paste('<b>Equipo:</b>', feat$properties$cit, feat$properties$team,
+                                   '<br><b>Estadio:</b>', feat$properties$arena,
                                    '<br><b>Salario medio:</b>',
-                                   round(map_df$salary[map_df$team_name == feat$properties$team]), "$")
+                                   format(round(map_df$salary[map_df$team_name == feat$properties$team], digits = 0), 
+                                          big.mark=".", decimal.mark = ","), "$")
     return(feat)
   })
   
@@ -61,8 +63,10 @@ draw_map <- function(positions){
               lat = sapply(geojson$features, function(feat) {
                 return(feat$geometr$coordinates[[2]])
               }),
-              #color = ~pal(map_df$salary)
+              color = sapply(geojson$features, function(feat) {
+                return(feat$properties$style$fillColor)
+              })
             ) %>% 
             leaflet::addLegend("bottomright", pal = pal, values = map_df$salary, title = "Salario",opacity = 1)
-            )
+    )
 }
