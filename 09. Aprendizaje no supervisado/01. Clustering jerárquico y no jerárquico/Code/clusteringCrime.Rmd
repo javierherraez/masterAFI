@@ -1,0 +1,349 @@
+---
+title: "clusteringCrime"
+output: html_document
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+require("knitr")
+
+opts_knit$set(root.dir = "C:/Users/jherraez/Documents/ASIGNATURAS MASTER/09. Aprendizaje no supervisado/01. Clustering jerárquico y no jerárquico/")
+
+setwd("C:/Users/jherraez/Documents/ASIGNATURAS MASTER/09. Aprendizaje no supervisado/01. Clustering jerárquico y no jerárquico/")
+
+####################
+# Lectura de datos #
+####################
+
+crime <- read.csv("Data/crime.csv", header = TRUE, sep="")
+str(crime)
+```
+
+# Procesamiento de datos
+
+## Imputación de missings
+
+```{r}
+summary(crime)
+
+# No hay datos missing
+
+```
+
+## Estadarización de variables
+
+```{r}
+
+crime.scale <- cbind(crime$State,as.data.frame(scale(crime[,c(2:8)])))
+summary(crime.scale)
+
+# En este caso, de acuerdo al rango de variación de las variables
+# continuas, si hubiera una variable binaria, se podría estandarizar
+# como -1 y 1
+
+```
+
+## Tratamiento de outliers
+
+```{r}
+
+logaritmoValoresPositivos <- function(x){x <- log(x-min(x)+1)}
+crime.scale.log <- as.data.frame(apply(crime.scale[,2:8], 2, logaritmoValoresPositivos))
+summary(crime.scale.log)
+# Para poner etiquetas en dendrogramas (no valdría con un cbind del State)
+rownames(crime.scale.log)<-crime$State #set new row names
+```
+
+## Eliminación de redundancias
+
+```{r}
+
+matrizCorrelacion<-cor(crime.scale.log, method = c("pearson"))
+#install.packages("corrplot")
+library(corrplot)
+corrplot(matrizCorrelacion, method="number", type="upper")
+
+# RAPE Y ASSAULT son las que tienen mayor correlación
+# Si se establece como umbral el valor 0.8, se podría dejar
+
+```
+
+# ALGORITMOS PARTICIONALES
+
+## K-MEANS
+
+```{r}
+
+# install.packages("cluster")
+library(cluster)
+
+# install.packages("factoextra")
+library(factoextra)
+
+# Las funciones del paquete factoextra emplean el nombre de las filas del
+# dataframe que contiene los datos como identificador de las observaciones.
+# Esto permite añadir labels a los gráficos.
+
+# fviz_nbclust automatiza la generación de un gráfico de codo a partir de k-means
+
+fviz_nbclust(x = crime.scale.log, FUNcluster = kmeans, method = "wss", k.max = 15, 
+             diss = get_dist(crime.scale.log, method = "euclidean"), nstart = 3)
+
+# ¿k = 4?
+
+clusterKmeans <- kmeans(x = crime.scale.log, centers = 4, nstart = 3)
+
+# fviz_cluster usa componentes principales (si p>2) para hacer la representación
+
+fviz_cluster(object = clusterKmeans, data = crime.scale.log, show.clust.cent = TRUE,
+             ellipse.type = "euclid", star.plot = TRUE, repel = TRUE) +
+  labs(title = "Resultados clustering K-means") +
+  theme_bw() +
+  theme(legend.position = "none")
+
+```
+
+## PAM
+
+```{r}
+
+# fviz_nbclust automatiza la generación de un gráfico de codo a partir de PAM
+
+fviz_nbclust(x = crime.scale.log, FUNcluster = pam, method = "wss", k.max = 15,
+             diss = dist(crime.scale.log, method = "manhattan"))
+
+clusterPAM <- pam(x = crime.scale.log, k = 4, metric = "manhattan")
+
+# El objeto devuelto por pam() contiene entre además de la asignación,
+# las observaciones que finalmente se han seleccionado como medoids ($medoids)
+clusterPAM$medoids
+
+# fviz_cluster usa componentes principales (si p>2) para hacer la representación
+
+fviz_cluster(object = clusterPAM, data = crime.scale.log, show.clust.cent = TRUE,
+             ellipse.type = "euclid", star.plot = TRUE, repel = TRUE) +
+  labs(title = "Resultados clustering K-means") +
+  theme_bw() +
+  theme(legend.position = "none")
+
+```
+
+# FUZZ C-MEANS
+```{r}
+
+#install.packages("ppclust")
+library(ppclust)
+
+clusterFCM <- fcm(crime.scale.log, centers=4, nstart=5, m=2)
+
+asignacionFCM<-cbind(crime.scale.log,clusterFCM$cluster)
+colnames(asignacionFCM)[8] <- "cluster"
+
+# install.packages("sqldf")
+library(sqldf)
+
+centroidesFCM <- sqldf("Select cluster, 
+                        count(*) as tamanyoCluster,
+                        avg(Murder) as Murder,
+                        avg(Rape) as Rape,
+                        avg(Robbery) as Robbery,
+                        avg(Assault) as Assault,
+                        avg(Burglary) as Burglary,
+                        avg(Larceny) as Larceny,
+                        avg(Auto_Theft) as Auto_Theft
+                        from asignacionFCM
+                        group by cluster")
+
+centroidesFCM
+
+```
+# ALGORITMOS JERÁRQUICOS
+
+```{r}
+
+# install.packages("vegan")
+library(vegan)
+
+#install.packages("cluster")
+library(cluster)
+
+matrizDistancias <- vegdist(crime.scale.log, method = "euclidean")
+clusterJerarquico <- hclust(matrizDistancias, method="ward.D2") 
+graphics.off()
+
+###################################
+# Elección del número de clusters #
+###################################
+
+###################
+# Con dendrograma #
+###################
+
+clusterJerarquico
+plot(as.dendrogram(clusterJerarquico), labels = FALSE, main = "Dendrograma")
+
+rect.hclust(clusterJerarquico, k=2, border="red") 
+rect.hclust(clusterJerarquico, k=3, border="blue") 
+rect.hclust(clusterJerarquico, k=4, border="green") 
+rect.hclust(clusterJerarquico, k=5, border="yellow") 
+rect.hclust(clusterJerarquico, k=6, border="purple") 
+rect.hclust(clusterJerarquico, k=7, border="gray") 
+rect.hclust(clusterJerarquico, k=8, border="black") 
+
+# k = 4
+
+# Para colorear las ramas
+
+# install.packages("dendextend")
+library(dendextend)
+
+dend <- as.dendrogram(clusterJerarquico)
+dend <- color_branches(dend, k=4) 
+plot(dend)
+
+###########################
+# Con Calinski y Harabasz #
+###########################
+
+calinsky <- cascadeKM(crime.scale.log, inf.gr = 2, sup.gr = 10, criterion = "calinski")
+calinsky$results
+
+# k = 2
+
+###########################
+# Con coeficiente silueta #
+###########################
+
+asw <- numeric(nrow(crime.scale.log))
+for(k in 2:(nrow(crime.scale) - 1)){
+  sil <- silhouette(cutree(clusterJerarquico, k = k), matrizDistancias)
+  asw[k] <- summary(sil)$avg.width}
+k.best <- which.max(asw)
+
+plot(1: nrow(crime.scale.log), asw, type="h", 
+     main = "Silhouette-optimal number of clusters", 
+     xlab = "k (number of groups)", ylab = "Average silhouette width")
+axis(1, k.best, paste("optimum", k.best, sep = "\n"), col = "red", font = 2,
+     col.axis = "red")
+points(k.best, max(asw), pch = 16, col = "red", cex = 1.5)
+
+# k = 2
+
+k <- 2
+cutg <- cutree(clusterJerarquico, k = k)
+sil <- silhouette(cutg, matrizDistancias)
+rownames(sil) <- crime$State
+
+plot(sil, main = "Silhouette plot", 
+     cex.names = 0.8, col = 2:(k + 1), nmax = 100)
+
+# k = 4
+
+k <- 4
+cutg <- cutree(clusterJerarquico, k = k)
+sil <- silhouette(cutg, matrizDistancias)
+rownames(sil) <- crime$State
+
+plot(sil, main = "Silhouette plot", 
+     cex.names = 0.8, col = 2:(k + 1), nmax = 100)
+
+```
+# BIETÁPICO
+
+```{r}
+
+# Supongamos que se decide hacer 4 clusters
+
+asignacionJerarquica<-cbind(crime.scale.log,
+                            cutree(clusterJerarquico, k = 4))
+
+colnames(asignacionJerarquica)[8] <- "cluster"
+
+# Cálculo de los centroides asociados a los grupos jerárquicos
+
+centroidesJerarquico<-  sqldf("Select cluster, 
+                        count(*) as tamanyoCluster,
+                        avg(Murder) as Murder,
+                        avg(Rape) as Rape,
+                        avg(Robbery) as Robbery,
+                        avg(Assault) as Assault,
+                        avg(Burglary) as Burglary,
+                        avg(Larceny) as Larceny,
+                        avg(Auto_Theft) as Auto_Theft
+                        from asignacionJerarquica
+                        group by cluster")
+
+# Distribución porcentual de los grupos en la muestra (jerárquico)
+
+centroidesJerarquico[2]
+centroidesJerarquico[2]/sum(centroidesJerarquico[2])
+
+# Se ejecuta el kmeans con los centroides obtenidos con el jerárquico
+
+##################
+# Método k-means #
+##################
+
+kmeans <- kmeans(crime.scale.log,centers=centroidesJerarquico[,3:9])
+kmeans$centers
+
+# Distribución porcentual de los grupos en el total de la cartera (optimización)
+
+kmeans$size/sum(kmeans$size)
+
+```
+# ALGORITMOS BASADOS EN DENSIDADES
+
+## DBSCAN
+
+```{r}
+
+# install.packages("dbscan")
+library("dbscan")
+clusterDBSCAN <- dbscan(crime.scale.log, eps = 0.5, minPts = 2)
+# Tamaños
+clusterDBSCAN
+clusterDBSCAN$cluster
+
+# Búsqueda de parámetros
+# Se establece una rejilla
+
+k <- c(1:10)
+eps <- c(0.5,1,1.5,2)
+
+grid <- expand.grid(k = k, eps = eps)
+
+results <- mapply(grid$k, grid$eps, FUN = function(k, eps) {
+  dbscan <- dbscan(crime.scale.log, minPts = k, eps = eps)
+  print(dbscan)
+})
+
+```
+
+## GMM
+
+```{r}
+
+#install.packages('mixtools')
+library(mixtools)
+
+set.seed(221275)
+clusterGaussianas <- normalmixEM(as.matrix(crime.scale.log), lambda = 0.5, k=2, maxit = 1000)
+plot(clusterGaussianas, density=TRUE, cex.axis=1.4, cex.lab=1.4, cex.main=1.8)
+
+# Hablando de erupciones, un ejemplo típico
+
+library(mixtools)
+data(faithful)
+
+# Distribución del tiempo que pasa entre erupciones
+
+hist(faithful$waiting, main="Tiempo entre erupciones del Old Faithful",
+     xlab="Minutos", ylab="", cex.main=1.5, cex.lab=1.5, cex.axis=1.4, col="blue")
+clusterGaussianas <- normalmixEM(faithful$waiting, lambda = 1, k=2, maxit = 30)
+plot(clusterGaussianas, density=TRUE, cex.axis=1.4, cex.lab=1.4, cex.main=1.8, main2="Time between Old Faithful eruptions", xlab2="Minutes")
+
+clusterGaussianas <- normalmixEM(faithful$waiting, lambda = 1, k=3, maxit = 30)
+plot(clusterGaussianas, density=TRUE, cex.axis=1.4, cex.lab=1.4, cex.main=1.8, main2="Time between Old Faithful eruptions", xlab2="Minutes")
+
+```
+
