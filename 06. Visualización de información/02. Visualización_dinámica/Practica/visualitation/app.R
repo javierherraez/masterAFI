@@ -6,7 +6,8 @@ library(leaflet)
 library(jsonlite)
 library(dygraphs)
 # setwd('ASIGNATURAS MASTER/06. Visualización de información/02. Visualización_dinámica/Practica/visualitation/')
-setwd('C:/Users/jherraez/Documents/masterAFI/06. Visualización de información/02. Visualización_dinámica/Practica/visualitation')
+#setwd('C:/Users/jherraez/Documents/masterAFI/06. Visualización de información/02. Visualización_dinámica/Practica/visualitation')
+setwd('C:/Users/Javier/Documents/masterAFI/06. Visualización de información/02. Visualización_dinámica/Practica/visualitation')
 source('functions.R')
 
 nba_df = read.csv('../data/nba2020.csv')
@@ -15,12 +16,13 @@ geojson <- readLines('../data/arenas.geojson', warn = FALSE, encoding = 'utf-8')
   paste(collapse = '\n') %>%
   fromJSON(simplifyVector = FALSE)
 
-geojson$style = list(
-  weight = 1,
-  opacity = 1,
-  fillOpacity = 0.3,
-  color = 'red'
-)
+conferences_nba <- unique(sapply(geojson$features, function(feat){
+  return (feat$properties$conference)
+}))
+
+divisions_nba <- unique(sapply(geojson$features, function(feat){
+  return (feat$properties$division)
+}))
 
 # Interface
 
@@ -58,16 +60,27 @@ ui <- dashboardPage(
       ),
       tabItem(tabName = 'Map',
               fluidRow(
-                column(width = 4,
+                column(12, h2('Salarios por equipos', style='color:#3C8DBC'))
+              ),
+              fluidRow(
+                column(width = 3,
                        wellPanel(checkboxGroupInput(inputId = 'position_map',
                                                     label = 'Posición',
                                                     choices = c('Center' = 'C', 
                                                                 'Foward' = 'F',
                                                                 'Guard' = 'G'),
-                                                    selected = 'C'))
+                                                    selected = 'C, F, G')),
+                       wellPanel(checkboxGroupInput(inputId = 'conference_map',
+                                                    label = 'Conferencia',
+                                                    choices = conferences_nba,
+                                                    selected = conferences_nba)),
+                       wellPanel(checkboxGroupInput(inputId = 'division_map',
+                                                    label = 'Division',
+                                                    choices = divisions_nba,
+                                                    selected = divisions_nba))
                 ),
-                column(width = 6,
-                       leafletOutput(outputId = 'mapa'))
+                column(width = 9,
+                       leafletOutput(outputId = 'mapa', height = 500))
               )
       )
     )
@@ -82,12 +95,18 @@ server <- function(input, output, session){
   })
   
   output$mapa <- renderLeaflet({
-    draw_map(input$position_map)
+    draw_map(input$position_map, input$conference_map, input$division_map)
   })
   
   observe({
     if(length(input$position_map) < 1){
-      updateCheckboxGroupInput(session, 'position_map', selected= 'C')
+      updateCheckboxGroupInput(session, 'position_map', selected = 'C')
+    }
+    if(length(input$conference_map) < 1){
+      updateCheckboxGroupInput(session, 'conference_map', selected = conferences_nba)
+    }
+    if(length(input$division_map) < 1){
+      updateCheckboxGroupInput(session, 'division_map', selected = divisions_nba)
     }
   })
 }
