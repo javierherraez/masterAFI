@@ -1,7 +1,7 @@
 library(xts)
 
-draw_dygraph <- function(team_filtre){
-  stats_date <- nba_df
+draw_dygraph <- function(df, team_filtre){
+  stats_date <- df
   if(team_filtre != "TODOS"){
     stats_date <- stats_date %>%
       filter(team_name == team_filtre)
@@ -34,8 +34,10 @@ draw_dygraph <- function(team_filtre){
             dyLegend(labelsDiv = "legenddygraph"))
 }
 
-draw_map <- function(positions, conferences, divisions){
-  map_df <- nba_df %>% 
+draw_map <- function(df, json, positions, conferences, divisions){
+  geojson <- json
+  
+  map_df <- df %>% 
     filter(grepl(paste(positions, collapse="|"), player_position)) %>% 
     group_by(team_name) %>%
     summarise(salary = sum(salary, na.rm = T) / n_distinct(id))

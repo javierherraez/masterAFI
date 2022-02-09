@@ -5,14 +5,13 @@ library(dplyr)
 library(leaflet)
 library(jsonlite)
 library(dygraphs)
-# setwd('ASIGNATURAS MASTER/06. Visualización de información/02. Visualización_dinámica/Practica/visualitation/')
-setwd('C:/Users/jherraez/Documents/masterAFI/06. Visualizacion de informacion/02. Visualizacion_dinamica/Practica/visualitation/app')
-#setwd('C:/Users/Javier/Documents/masterAFI/06. Visualización de información/02. Visualización_dinámica/Practica/visualitation')
+#setwd('C:/Users/jherraez/Documents/masterAFI/06. Visualizacion de informacion/02. Visualizacion_dinamica/Practica/visualitation')
+#setwd('C:/Users/Javier/Documents/masterAFI/60. Visualizacion de informacion/02. Visualizacion_dinamica/Practica/visualitation')
 source('functions.R')
 
-nba_df = read.csv('../data/nba2020.csv')
+nba_df = read.csv('nba2020.csv')
 nba_df$date <- as.Date(nba_df$date)
-geojson <- readLines('../data/arenas.geojson', warn = FALSE, encoding = 'utf-8') %>%
+geojson <- readLines('arenas.geojson', warn = FALSE, encoding = 'utf-8') %>%
   paste(collapse = '\n') %>%
   fromJSON(simplifyVector = FALSE)
 
@@ -91,11 +90,11 @@ ui <- dashboardPage(
 
 server <- function(input, output, session){
   output$dygraph <- renderDygraph({
-    draw_dygraph(input$team_weekly)
+    draw_dygraph(nba_df, input$team_weekly)
   })
   
   output$mapa <- renderLeaflet({
-    draw_map(input$position_map, input$conference_map, input$division_map)
+    draw_map(nba_df, geojson, input$position_map, input$conference_map, input$division_map)
   })
   
   observe({
