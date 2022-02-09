@@ -5,9 +5,7 @@ account: javierherraezalbarran
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 5616947
-bundleId: 5561739
+bundleId: 5563007
 url: https://javierherraezalbarran.shinyapps.io/statsNBA/
-when: 1644424528.61197
-lastSyncTime: 1644424528.61197
-asMultiple: FALSE
-asStatic: FALSE
+when: 1644450382.71048
+lastSyncTime: 1644450382.71048

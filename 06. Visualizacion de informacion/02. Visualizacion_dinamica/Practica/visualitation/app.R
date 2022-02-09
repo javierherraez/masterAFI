@@ -5,8 +5,8 @@ library(dplyr)
 library(leaflet)
 library(jsonlite)
 library(dygraphs)
-#setwd('C:/Users/jherraez/Documents/masterAFI/06. Visualizacion de informacion/02. Visualizacion_dinamica/Practica/visualitation')
-#setwd('C:/Users/Javier/Documents/masterAFI/60. Visualizacion de informacion/02. Visualizacion_dinamica/Practica/visualitation')
+# setwd('C:/Users/jherraez/Documents/masterAFI/06. Visualizacion de informacion/02. Visualizacion_dinamica/Practica/visualitation')
+# setwd('C:/Users/Javier/Documents/masterAFI/06. Visualizacion de informacion/02. Visualizacion_dinamica/Practica/visualitation')
 source('functions.R')
 
 nba_df = read.csv('nba2020.csv')
@@ -22,6 +22,10 @@ conferences_nba <- unique(sapply(geojson$features, function(feat){
 divisions_nba <- unique(sapply(geojson$features, function(feat){
   return (feat$properties$division)
 }))
+
+pair_conference_division <- unique(as.data.frame(t(sapply(geojson$features, function(feat){
+  return (c(feat$properties$conference, feat$properties$division))
+}))))
 
 # Interface
 
@@ -106,6 +110,10 @@ server <- function(input, output, session){
     }
     if(length(input$division_map) < 1){
       updateCheckboxGroupInput(session, 'division_map', selected = divisions_nba)
+    }
+    conf_div <- expand.grid(input$conference_map, input$division_map)
+    if(!any(do.call(paste0, conf_div) %in% do.call(paste0, pair_conference_division))){
+      updateCheckboxGroupInput(session, 'conference_map', selected = conferences_nba)
     }
   })
 }
