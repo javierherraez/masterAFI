@@ -6,9 +6,9 @@ output: html_document
 ```{r setup, include=FALSE, echo=FALSE}
 require("knitr")
 
-opts_knit$set(root.dir = "C:/Users/jherraez/Documents/ASIGNATURAS MASTER/09. Aprendizaje no supervisado/01. Clustering jerárquico y no jerárquico/")
+opts_knit$set(root.dir = "C:/Users/jherraez/Documents/masterAFI/09. Aprendizaje no supervisado/01. Clustering jerarquico y no jerarquico/")
 
-setwd("C:/Users/jherraez/Documents/ASIGNATURAS MASTER/09. Aprendizaje no supervisado/01. Clustering jerárquico y no jerárquico/")
+setwd("C:/Users/jherraez/Documents/masterAFI/09. Aprendizaje no supervisado/01. Clustering jerarquico y no jerarquico/")
 
 ####################
 # Lectura de datos #
@@ -16,6 +16,7 @@ setwd("C:/Users/jherraez/Documents/ASIGNATURAS MASTER/09. Aprendizaje no supervi
 
 crime <- read.csv("Data/crime.csv", header = TRUE, sep="")
 str(crime)
+
 ```
 
 # Procesamiento de datos
@@ -23,9 +24,18 @@ str(crime)
 ## Imputación de missings
 
 ```{r}
-summary(crime)
 
+summary(crime)
 # No hay datos missing
+
+prcomp(crime[,2:8])
+prcomp(crime[,2:8],center=TRUE,scale=TRUE)
+library(FactoMineR)
+# help(PCA)
+x<-PCA(crime[,2:8],scale.unit=TRUE)
+x$eig
+# Parece ser que es bastante mejor t-SNE que PCA por lo menos para visualizar:
+# https://medium.com/analytics-vidhya/pca-vs-t-sne-17bcd882bf3d
 
 ```
 
@@ -49,6 +59,10 @@ summary(crime.scale)
 logaritmoValoresPositivos <- function(x){x <- log(x-min(x)+1)}
 crime.scale.log <- as.data.frame(apply(crime.scale[,2:8], 2, logaritmoValoresPositivos))
 summary(crime.scale.log)
+
+par(mfrow=c(1,2))
+hist(crime.scale$Larceny)
+hist(crime.scale.log$Larceny)
 # Para poner etiquetas en dendrogramas (no valdría con un cbind del State)
 rownames(crime.scale.log)<-crime$State #set new row names
 ```
@@ -91,6 +105,7 @@ fviz_nbclust(x = crime.scale.log, FUNcluster = kmeans, method = "wss", k.max = 1
 # ¿k = 4?
 
 clusterKmeans <- kmeans(x = crime.scale.log, centers = 4, nstart = 3)
+clusterKmeans$centers
 
 # fviz_cluster usa componentes principales (si p>2) para hacer la representación
 
@@ -133,7 +148,7 @@ fviz_cluster(object = clusterPAM, data = crime.scale.log, show.clust.cent = TRUE
 #install.packages("ppclust")
 library(ppclust)
 
-clusterFCM <- fcm(crime.scale.log, centers=4, nstart=5, m=2)
+clusterFCM <- fcm(crime.scale.log, centers=4, nstart=3, m=2)
 
 asignacionFCM<-cbind(crime.scale.log,clusterFCM$cluster)
 colnames(asignacionFCM)[8] <- "cluster"
@@ -179,7 +194,7 @@ graphics.off()
 ###################
 
 clusterJerarquico
-plot(as.dendrogram(clusterJerarquico), labels = FALSE, main = "Dendrograma")
+plot(as.dendrogram(clusterJerarquico),  main = "Dendrograma")
 
 rect.hclust(clusterJerarquico, k=2, border="red") 
 rect.hclust(clusterJerarquico, k=3, border="blue") 
@@ -188,6 +203,8 @@ rect.hclust(clusterJerarquico, k=5, border="yellow")
 rect.hclust(clusterJerarquico, k=6, border="purple") 
 rect.hclust(clusterJerarquico, k=7, border="gray") 
 rect.hclust(clusterJerarquico, k=8, border="black") 
+```
+```{r}
 
 # k = 4
 
@@ -225,6 +242,8 @@ plot(1: nrow(crime.scale.log), asw, type="h",
 axis(1, k.best, paste("optimum", k.best, sep = "\n"), col = "red", font = 2,
      col.axis = "red")
 points(k.best, max(asw), pch = 16, col = "red", cex = 1.5)
+```
+```{r}
 
 # k = 2
 
@@ -235,6 +254,8 @@ rownames(sil) <- crime$State
 
 plot(sil, main = "Silhouette plot", 
      cex.names = 0.8, col = 2:(k + 1), nmax = 100)
+```
+```{r}
 
 # k = 4
 
@@ -247,11 +268,14 @@ plot(sil, main = "Silhouette plot",
      cex.names = 0.8, col = 2:(k + 1), nmax = 100)
 
 ```
+
 # BIETÁPICO
 
 ```{r}
 
 # Supongamos que se decide hacer 4 clusters
+# así cogemos los clusters para k = 4
+
 
 asignacionJerarquica<-cbind(crime.scale.log,
                             cutree(clusterJerarquico, k = 4))
@@ -290,6 +314,11 @@ kmeans$centers
 
 kmeans$size/sum(kmeans$size)
 
+centroidesJerarquico2=rbind(centroidesJerarquico,c(5,0,0,0,0,0,0,0,0))
+
+kmeans <- kmeans(crime.scale.log,centers=centroidesJerarquico2[,3:9])
+kmeans$centers
+
 ```
 # ALGORITMOS BASADOS EN DENSIDADES
 
@@ -299,23 +328,63 @@ kmeans$size/sum(kmeans$size)
 
 # install.packages("dbscan")
 library("dbscan")
-clusterDBSCAN <- dbscan(crime.scale.log, eps = 0.5, minPts = 2)
-# Tamaños
+
+# Aunque algunos autores recomiendan tomar k>=p+1 donde p es el número 
+# de variables (y en particular k=2*p, la experiencia de muestra que un valor de k entre 3 y 5 suele funcionar bien
+
+# Esta función selecciona para cada punto, los 3 vecinos más cercanos
+
+nn <- kNN(crime.scale.log, k=3)
+head(nn$id)
+
+# Si yo pongo k=min_points, ¿cuánto se distancian en media los vecinos?
+# Calculo para cada uno de los 50 puntos, la distancia media a sus min_points vecinos y las represento en el eje X
+# Primero el punto con menor distancia media, después el segundo punto, etc.
+
+for (min_points in 3:5)
+{
+  kNNdistplot(crime.scale.log, k = min_points  )
+}
+
+# Para k = 3, parece que podría haber un codo alrededor de 0.6
+kNNdistplot(crime.scale.log, k = 3)
+abline(h=0.60, col = "red", lty=2)
+clusterDBSCAN <- dbscan(crime.scale.log, eps = 0.60, minPts = 3)
 clusterDBSCAN
 clusterDBSCAN$cluster
 
-# Búsqueda de parámetros
-# Se establece una rejilla
+# Para k = 4 y 5, parece que podría haber un codo alrededor de 0.8 o 0.75
+kNNdistplot(crime.scale.log, k = 4)
+abline(h=0.55, col = "red", lty=2)
+clusterDBSCAN <- dbscan(crime.scale.log, eps = 0.8, minPts = 4)
+clusterDBSCAN
+clusterDBSCAN$cluster
 
-k <- c(1:10)
-eps <- c(0.5,1,1.5,2)
+kNNdistplot(crime.scale.log, k = 5)
+abline(h=0.75, col = "red", lty=2)
+clusterDBSCAN <- dbscan(crime.scale.log, eps = 0.75, minPts = 5)
+clusterDBSCAN
+clusterDBSCAN$cluster
 
-grid <- expand.grid(k = k, eps = eps)
+# Nos convence 3
 
-results <- mapply(grid$k, grid$eps, FUN = function(k, eps) {
-  dbscan <- dbscan(crime.scale.log, minPts = k, eps = eps)
-  print(dbscan)
-})
+clusterDBSCAN <- dbscan(crime.scale.log, eps = 0.60, minPts = 3)
+clusterDBSCAN
+clusterDBSCAN$cluster
+hullplot(crime.scale.log,clusterDBSCAN$cluster)
+
+# Otra posibilidad es establecer una rejilla para ambas cantidades,
+# hacer todos los DBSCAN y medir alguna métrica como por ejemplo el WWS
+
+#k <- c(1:10)
+#eps <- c(0.5,1,1.5,2)
+
+#grid <- expand.grid(k = k, eps = eps)
+
+#results <- mapply(grid$k, grid$eps, FUN = function(k, eps) {
+#  dbscan <- dbscan(crime.scale.log, minPts = k, eps = eps)
+#  print(dbscan)
+#})
 
 ```
 
@@ -327,6 +396,7 @@ results <- mapply(grid$k, grid$eps, FUN = function(k, eps) {
 library(mixtools)
 
 set.seed(221275)
+
 clusterGaussianas <- normalmixEM(as.matrix(crime.scale.log), lambda = 0.5, k=2, maxit = 1000)
 plot(clusterGaussianas, density=TRUE, cex.axis=1.4, cex.lab=1.4, cex.main=1.8)
 

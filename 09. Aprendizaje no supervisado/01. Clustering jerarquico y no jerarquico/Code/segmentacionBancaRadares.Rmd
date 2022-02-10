@@ -6,15 +6,15 @@ output: html_document
 ```{r setup, include=FALSE, echo=FALSE}
 require("knitr")
 
-opts_knit$set(root.dir = "C:/Users/jherraez/Documents/ASIGNATURAS MASTER/09. Aprendizaje no supervisado/01. Clustering jerárquico y no jerárquico/")
+opts_knit$set(root.dir = "C:/Proyectos/AFI/cursos_20212022/Regular")
 
-setwd("C:/Users/jherraez/Documents/ASIGNATURAS MASTER/09. Aprendizaje no supervisado/01. Clustering jerárquico y no jerárquico/")
+setwd("C:/Proyectos/AFI/cursos_20212022/Regular")
 
 ####################
 # Lectura de datos #
 ####################
 
-datosBanca <- read.csv("Data/datosBanca.csv", header = TRUE, sep=",")
+datosBanca <- read.csv("datosBanca.csv", header = TRUE, sep=",")
 ```
 
 # Discretización de variables
@@ -66,9 +66,6 @@ datosBanca$loan_CAT[is.na(datosBanca$loan_CAT)]<-0
 datosBanca$cards_CAT[is.na(datosBanca$cards_CAT)]<-0
 datosBanca$insurance_CAT[is.na(datosBanca$insurance_CAT)]<-0
 datosBanca$billPayment_CAT[is.na(datosBanca$billPayment_CAT)]<-0
-
-
-cor(datosBanca[, 12:21], method = "spearman") # mejor que la correlación normal, es correlación de tipo rango
 ```
 
 # Cálculo de centroides

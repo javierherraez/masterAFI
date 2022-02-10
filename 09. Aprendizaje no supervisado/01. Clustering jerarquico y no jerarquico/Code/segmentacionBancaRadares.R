@@ -2,12 +2,12 @@
 rm(list=ls())
 
 # directorio de trabajo
-setwd("C:/Proyectos/AFI/cursos_20212022/Regular")
+setwd("Z:/MDS_F/Aprendizaje no supervisado/Data")
 
 datosBanca <- read.csv("datosBanca.csv", header = TRUE, sep=",")
 summary(datosBanca)
 
-# Estandarización mediante discretización
+# Estandarizaci?n mediante discretizaci?n
 
 # install.packages("nima")
 library(nima)
@@ -34,7 +34,7 @@ datosBanca$cards_CAT<-discrete_by_quantile(datosBanca$cards)/4
 datosBanca$insurance_CAT<-discrete_by_quantile(datosBanca$insurance)/4
 datosBanca$billPayment_CAT<-discrete_by_quantile(datosBanca$billPayment)/4
 
-# La domiciliación de nómina es binaria y no es preciso estandarizarla
+# La domiciliaci?n de n?mina es binaria y no es preciso estandarizarla
 
 datosBanca$salary_CAT<-as.numeric(datosBanca$salary)
   
@@ -52,6 +52,8 @@ datosBanca$cards_CAT[is.na(datosBanca$cards_CAT)]<-0
 datosBanca$insurance_CAT[is.na(datosBanca$insurance_CAT)]<-0
 datosBanca$billPayment_CAT[is.na(datosBanca$billPayment_CAT)]<-0
 
+help(cor)
+cor(datosBanca[,12:21],method = c("spearman"))
 # install.packages("sqldf")
 library(sqldf)
 
@@ -115,9 +117,9 @@ centroideInversores <-  sqldf("Select
 
 centroides<-rbind(centroideTotalCartera,centroideNominados,centroideHipotecados,centroideInversores)
 
-# Adjuntamos los límites del gráfico de radar (0 y 1)
-# Esto es necesario para utilizar la función gráfica de rádar
-# También adjuntamos el comportamiento medio de la cartera
+# Adjuntamos los l?mites del gr?fico de radar (0 y 1)
+# Esto es necesario para utilizar la funci?n gr?fica de r?dar
+# Tambi?n adjuntamos el comportamiento medio de la cartera
 # para poder comparar cada centroide con la media total
 
 # install.packages("fmsb")
