@@ -376,15 +376,15 @@ hullplot(crime.scale.log,clusterDBSCAN$cluster)
 # Otra posibilidad es establecer una rejilla para ambas cantidades,
 # hacer todos los DBSCAN y medir alguna métrica como por ejemplo el WWS
 
-#k <- c(1:10)
-#eps <- c(0.5,1,1.5,2)
+k <- c(1:10)
+eps <- c(0.5,1,1.5,2)
 
-#grid <- expand.grid(k = k, eps = eps)
+grid <- expand.grid(k = k, eps = eps)
 
-#results <- mapply(grid$k, grid$eps, FUN = function(k, eps) {
-#  dbscan <- dbscan(crime.scale.log, minPts = k, eps = eps)
-#  print(dbscan)
-#})
+results <- mapply(grid$k, grid$eps, FUN = function(k, eps) {
+ dbscan <- dbscan(crime.scale.log, minPts = k, eps = eps)
+ print(dbscan)
+})
 
 ```
 
