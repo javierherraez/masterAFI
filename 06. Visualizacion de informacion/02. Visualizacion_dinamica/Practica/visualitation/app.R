@@ -5,6 +5,8 @@ library(dplyr)
 library(leaflet)
 library(jsonlite)
 library(dygraphs)
+library(plotly)
+require(scales)
 # setwd('C:/Users/jherraez/Documents/masterAFI/06. Visualizacion de informacion/02. Visualizacion_dinamica/Practica/visualitation')
 # setwd('C:/Users/Javier/Documents/masterAFI/06. Visualizacion de informacion/02. Visualizacion_dinamica/Practica/visualitation')
 source('functions.R')
@@ -27,6 +29,9 @@ pair_conference_division <- unique(as.data.frame(t(sapply(geojson$features, func
   return (c(feat$properties$conference, feat$properties$division))
 }))))
 
+stats <- colnames(nba_df)[8:length(colnames(nba_df))]
+stats <- stats[!stats == 'date']
+
 # Interface
 
 ui <- dashboardPage(
@@ -38,7 +43,8 @@ ui <- dashboardPage(
   dashboardSidebar(
     sidebarMenu(
       menuItem('Estadísticas Promedio Semanales', tabName = 'Temporal'),
-      menuItem('Salario por equipos', tabName = 'Map')
+      menuItem('Salario por equipos', tabName = 'Map'),
+      menuItem('Comprarción Estadísticas', tabName = 'Comparison')
     ),
     width = 300),
   dashboardBody(
@@ -85,6 +91,28 @@ ui <- dashboardPage(
                 column(width = 9,
                        leafletOutput(outputId = 'mapa', height = 500))
               )
+      ),
+      tabItem(tabName = 'Comparison',
+              fluidRow(
+                column(12, h2('Comparación de Estadísticas', style='color:#3C8DBC'))
+              ),
+              fluidRow(
+                column(width = 3,
+                       wellPanel(radioButtons(inputId = 'var_comparison',
+                                              label = 'Variable a Comparar',
+                                              choices = c('Equipo' = 'team_name', 
+                                                          'Posición' = 'player_position',
+                                                          'Top 30 Jugadores' = 'player'),
+                                              selected = 'team_name')),
+                       wellPanel(radioButtons(inputId = 'stat_comparison',
+                                              label = 'Estadística',
+                                              choices = stats,
+                                              selected = stats[1]))
+                ),
+                column(width = 9,
+                       box(plotlyOutput('comparison_plot'), width=12)
+                )
+              )
       )
     )
   )
@@ -99,6 +127,10 @@ server <- function(input, output, session){
   
   output$mapa <- renderLeaflet({
     draw_map(nba_df, geojson, input$position_map, input$conference_map, input$division_map)
+  })
+  
+  output$comparison_plot <- renderPlotly({
+    draw_barplot(nba_df, input$stat_comparison, input$var_comparison)
   })
   
   observe({

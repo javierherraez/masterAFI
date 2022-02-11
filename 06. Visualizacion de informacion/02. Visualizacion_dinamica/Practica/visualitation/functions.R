@@ -153,24 +153,53 @@ draw_map <- function(df,json,positions,conferences,divisions) {
 }
 
 
-draw_barplot <- function(df, entry_stat){
-  entry_stat <- "points"
-  entry_var <- "team_name"
+draw_barplot <- function(df, entry_stat, entry_var){
   var_sym <- rlang::sym(entry_var)
   stat_sym <- rlang::sym(entry_stat)
   
-  stat_df <- nba_df %>%
-    select({{entry_var}}, {{entry_stat}}) %>% 
-    group_by({{var_sym}}) %>% 
-    summarise("stat" := mean({{stat_sym}}, na.rm = T))
-  # 
-  # nba_df %>% 
-  #   do(Split.position("-"))
-  #   filter(player_position != "") %>% 
-  #   mutate(player_position = function(player_position) unlist(strsplit(player_position, '-'))) %>% 
-  #   group_by(player_position) %>% summarise("stat" = mean(points))
-  return(ggplot(stat_df, aes(reorder(team_name, -stat), stat)) +
-           geom_col())
-}
+  if (entry_var == "player_position"){
+    df <- df %>%
+      filter(player_position != "") %>%
+      mutate(player_position = substr(player_position, 1, 1))
+  }
+  
+  if ((entry_stat == "salary") & (!entry_var == 'player')){
+    stat_df <- df %>%
+      select({{entry_var}}, {{entry_stat}}, game_id, player) %>% 
+      group_by(player, {{var_sym}}) %>%
+      summarise({{entry_stat}} := mean({{stat_sym}})) %>%
+      group_by({{var_sym}}) %>% 
+      summarise("stat" := ifelse({{entry_var}} == 'team_name',
+                                 sum({{stat_sym}}, na.rm = T),
+                                 mean({{stat_sym}}, na.rm = T))) %>% 
+      mutate("var" := {{var_sym}})
+  }else{
+    stat_df <- df %>%
+      select({{entry_var}}, {{entry_stat}}, game_id, player_id) %>% 
+      group_by({{var_sym}}) %>% 
+      summarise("stat" := ifelse({{entry_var}} == "team_name",
+                                 sum({{stat_sym}}, na.rm = T) / n_distinct(game_id),
+                                 mean({{stat_sym}}, na.rm = T))) %>% 
+      mutate("var" := {{var_sym}}) %>% 
+      slice_max(stat, n = 30)
+  }
+  
+  
+  title_chart <- paste0('media de ', entry_stat)
+  if(entry_var == 'team_name'){
+    if(entry_stat == 'salary'){
+      title_chart <- paste0(entry_stat, ' total')
+    }else{
+      title_chart <- paste0(entry_stat, ' por partido')
+    }
+  }
 
+  plot <- ggplot(stat_df, aes(reorder(var, -stat), stat, fill = var)) +
+           geom_col(show.legend = F) +
+           labs(title = title_chart, x = entry_var, y = entry_stat) +
+           scale_y_continuous(labels = comma) +
+           theme_bw() +
+           theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+  return(ggplotly(plot))
+}
 
