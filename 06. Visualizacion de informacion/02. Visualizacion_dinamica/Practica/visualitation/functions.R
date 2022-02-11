@@ -151,3 +151,26 @@ draw_map <- function(df,json,positions,conferences,divisions) {
       leaflet::addLegend("bottomright", pal = pal, values = salary_df$salary, title = "Salario", opacity = 1)
   )
 }
+
+
+draw_barplot <- function(df, entry_stat){
+  entry_stat <- "points"
+  entry_var <- "team_name"
+  var_sym <- rlang::sym(entry_var)
+  stat_sym <- rlang::sym(entry_stat)
+  
+  stat_df <- nba_df %>%
+    select({{entry_var}}, {{entry_stat}}) %>% 
+    group_by({{var_sym}}) %>% 
+    summarise("stat" := mean({{stat_sym}}, na.rm = T))
+  # 
+  # nba_df %>% 
+  #   do(Split.position("-"))
+  #   filter(player_position != "") %>% 
+  #   mutate(player_position = function(player_position) unlist(strsplit(player_position, '-'))) %>% 
+  #   group_by(player_position) %>% summarise("stat" = mean(points))
+  return(ggplot(stat_df, aes(reorder(team_name, -stat), stat)) +
+           geom_col())
+}
+
+
