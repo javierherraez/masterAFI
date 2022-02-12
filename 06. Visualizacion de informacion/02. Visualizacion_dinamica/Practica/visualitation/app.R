@@ -7,9 +7,9 @@ library(jsonlite)
 library(dygraphs)
 library(plotly)
 require(scales)
+source('functions.R')
 # setwd('C:/Users/jherraez/Documents/masterAFI/06. Visualizacion de informacion/02. Visualizacion_dinamica/Practica/visualitation')
 # setwd('C:/Users/Javier/Documents/masterAFI/06. Visualizacion de informacion/02. Visualizacion_dinamica/Practica/visualitation')
-source('functions.R')
 
 nba_df = read.csv('nba2020.csv')
 nba_df$date <- as.Date(nba_df$date)
@@ -29,8 +29,16 @@ pair_conference_division <- unique(as.data.frame(t(sapply(geojson$features, func
   return (c(feat$properties$conference, feat$properties$division))
 }))))
 
-stats <- colnames(nba_df)[8:length(colnames(nba_df))]
-stats <- stats[!stats == 'date']
+stats <- c('Puntos' =  'points',
+           'Asistencias' =  'assists',
+           'Rebotes' = 'rebounds',
+           'Robos' = 'steals',
+           'Bloqueos' = 'blocks',
+           'Faltas Personales' = 'personal_foul',
+           'Pérdidas' = 'turnovers',
+           'Tiros de campo anotados' = 'field_goals_made',
+           'Tiros de campo intentados' = 'field_goals_attempted',
+           'Salario' = 'salary')
 
 # Interface
 
@@ -44,7 +52,7 @@ ui <- dashboardPage(
     sidebarMenu(
       menuItem('Estadísticas Promedio Semanales', tabName = 'Temporal'),
       menuItem('Salario por equipos', tabName = 'Map'),
-      menuItem('Comprarción Estadísticas', tabName = 'Comparison')
+      menuItem('Comparación Estadísticas', tabName = 'Comparison')
     ),
     width = 300),
   dashboardBody(
@@ -69,7 +77,7 @@ ui <- dashboardPage(
       ),
       tabItem(tabName = 'Map',
               fluidRow(
-                column(12, h2('Salarios por equipos', style='color:#3C8DBC'))
+                column(12, h2('Salarios por Equipos', style='color:#3C8DBC'))
               ),
               fluidRow(
                 column(width = 3,
