@@ -3,7 +3,6 @@ from time import sleep
 
 import pandas as pd
 import requests
-from numpy import arange
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 
@@ -33,7 +32,7 @@ URL = 'https://balldontlie.io/api/v1/stats'
 
 
 def get_nba_stats_api(page: int, previous_error: bool):
-    print(page, previous_error)
+    # print(page, previous_error)
     if (previous_error):
         sleep(1)
     params = {
@@ -45,16 +44,18 @@ def get_nba_stats_api(page: int, previous_error: bool):
     try:
         response = requests.get(URL, params)
     except:
-        if (previous_error):
-            sys.exit()
+        print("Error en la petición")
+        sys.exit()
+    # Too Many Requests
+    if (response.status_code == 429):
         sleep(10)
-        get_nba_stats_api(page, True)
+        return get_nba_stats_api(page, True)
     if (response.status_code != 200):
         return None, True
     return response.json(), previous_error
 
 
-def stats_to_dataframe(stat):
+def select_stats(stat):
     # hay observaciones sin jugador
     if stat['player']:
         return {
@@ -85,7 +86,7 @@ def get_nba_stats():
     while page is not None:
         response, previous_error = get_nba_stats_api(page, previous_error)
         for stat in response['data']:
-            current_stat = stats_to_dataframe(stat)
+            current_stat = select_stats(stat)
             df_nba = df_nba.append(current_stat, ignore_index=True)
         page = response['meta']['next_page']
     return df_nba

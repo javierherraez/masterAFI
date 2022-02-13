@@ -102,7 +102,7 @@ draw_map <- function(df,json,positions,conferences,divisions) {
 }
 
 
-draw_barplot <- function(df, entry_stat, entry_var){
+draw_barplot <- function(df, entry_stat, entry_var, stats){
   var_sym <- rlang::sym(entry_var)
   stat_sym <- rlang::sym(entry_stat)
   

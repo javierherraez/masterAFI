@@ -84,7 +84,7 @@ ui <- dashboardPage(
                        wellPanel(checkboxGroupInput(inputId = 'position_map',
                                                     label = 'Posición',
                                                     choices = c('Center' = 'C', 
-                                                                'Foward' = 'F',
+                                                                'Forward' = 'F',
                                                                 'Guard' = 'G'),
                                                     selected = 'C, F, G')),
                        wellPanel(checkboxGroupInput(inputId = 'conference_map',
@@ -138,7 +138,7 @@ server <- function(input, output, session){
   })
   
   output$comparison_plot <- renderPlotly({
-    draw_barplot(nba_df, input$stat_comparison, input$var_comparison)
+    draw_barplot(nba_df, input$stat_comparison, input$var_comparison, stats)
   })
   
   observe({
