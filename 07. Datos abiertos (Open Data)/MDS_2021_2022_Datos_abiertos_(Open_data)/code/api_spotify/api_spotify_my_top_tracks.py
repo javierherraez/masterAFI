@@ -10,7 +10,7 @@ def download_user_top_tracks(limit, time_range, client_id,
                        redirect_uri = redirect_uri,
                        scope = 'user-top-read')
 
-    sp = spotipy.Spotify(auth_manager = spc)
+    sp = spotipy.Spotify(oauth_manager = spc)
     
     results = sp.current_user_top_tracks(limit = limit, time_range = time_range)
     for idx, item in enumerate(results['items']):
@@ -21,15 +21,17 @@ def download_user_top_tracks(limit, time_range, client_id,
     return results['items']
 
 
-client_id = '942e93e82e774ef8a322eab3fb3c4243'
-client_secret = '858f864ac8674d5f960c9b57e318bb6d'
+client_id = '8ced8a41ea494b6a9aeec2ace0710ecf'
+client_secret = '72b994c4bae143759a4d1401cfa4468f'
+
+
 redirect_uri = 'http://localhost:8080'
 
-user_top_tracks = download_user_top_tracks(limit = 50, 
+user_top_tracks = download_user_top_tracks(limit = 100, 
                                            time_range = 'long_term', 
                                            client_id = client_id, 
                                            client_secret = client_secret, 
                                            redirect_uri = redirect_uri)
 
-with open('.\\code\\api_spotify\\spotify2.json', 'w', encoding = 'utf-8') as file:
+with open('.\\api_spotify\\spotify2.json', 'w', encoding = 'utf-8') as file:
     json.dump(user_top_tracks, file, ensure_ascii = False, indent = 4)

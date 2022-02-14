@@ -1,0 +1,512 @@
+---
+title: "Case Study: Predicting Airline Delays"
+author: "Máster en Data Science y Big Data en Finanzas"
+date: 'AFI, 2022'
+output:
+  html_document: 
+    css: my-theme.css
+    theme: cerulean
+    highlight: tango
+    number_sections: no
+    toc: no
+    toc_depth: 1
+  pdf_document:
+    css: my-theme.css
+    theme: cerulean
+    highlight: tango
+    number_sections: yes
+    toc: yes
+    toc_depth: 1
+editor_options:
+  chunk_output_type: console
+---
+    
+```{r global_options, include=T, echo = F}
+knitr::opts_chunk$set(echo = T, warning=FALSE, message=FALSE)
+```
+
+```{r, echo=FALSE}
+htmltools::img(src = knitr::image_uri(file.path("AfiLogo.jpg")), 
+               alt = 'logo', 
+               style = 'position:absolute; top:0; right:0; padding:10px;',
+               width="173",
+               height="77")
+```
+
+# Introduction 
+
+On any given day, more than 90,000 flights operate in the US. About one-third of these flights are commercial flights, operated by companies like United, American Airlines, etc. Among these commercial flights, 20% suffer from delays due to various reasons. A certain number of delays are unavoidable, due to unexpected events, but some delays could hopefully be avoided if the factors causing delays are better understood and addressed.
+
+<center>
+<img src="flight-delays.jpg" width="500"/>
+</center>
+
+<br>
+
+In this case study, we will use a dataset with 9,381 flights that occurred in June-August, 2014 between the three busiest US airports:
+
+  - Atlanta (ATL)
+  - Los Angeles (LAX)
+  - Chicago (ORD)
+  
+### The dataset  
+  
+The dataset AirlineDelay.csv includes the following 23 variables:
+
+- Flight = the origin-destination pair (LAX-ORD, ATL-LAX, etc.)
+- Carrier = the carrier operating the flight (American Airlines, Delta Air Lines, etc.)
+- Month = the month of the flight (June, July, or August)
+- DayOfWeek = the day of the week of the flight (Monday, Tuesday, etc.)
+- NumPrevFlights = the number of previous flights taken by this aircraft in the same day
+- PrevFlightGap = the amount of time between when this flight's aircraft is scheduled to arrive at the airport and when it's scheduled to depart for this flight
+- HistoricallyLate = the proportion of time this flight has been late historically
+- InsufficientHistory = whether or not we have enough data to determine the historical record of the flight (equal to 1 if we don't have at least 3 records, equal to 0 if we do)
+- OriginInVolume = the amount of incoming traffic volume at the origin airport, normalized by the typical volume during the flight's time and day of the week
+- OriginOutVolume = the amount of outgoing traffic volume at the origin airport, normalized by the typical volume during the flight's time and day of the week
+- DestInVolume = the amount of incoming traffic volume at the destination airport, normalized by the typical volume during the flight's time and day of the week
+- DestOutVolume = the amount of outgoing traffic volume at the destination airport, normalized by the typical volume during the flight's time and day of the week
+- OriginPrecip = the amount of rain at the origin over the course of the day, in tenths of millimeters
+- OriginAvgWind = average daily wind speed at the origin, in miles per hour
+- OriginWindGust = fastest wind speed during the day at the origin, in miles per hour
+- OriginFog = whether or not there was fog at some point during the day at the origin (1 if there was, 0 if there wasn't)
+- OriginThunder = whether or not there was thunder at some point during the day at the origin (1 if there was, 0 if there wasn't)
+- DestPrecip = the amount of rain at the destination over the course of the day, in tenths of millimeters
+- DestAvgWind = average daily wind speed at the destination, in miles per hour
+- DestWindGust = fastest wind speed during the day at the destination, in miles per hour
+- DestFog = whether or not there was fog at some point during the day at the destination (1 if there was, 0 if there wasn't)
+- DestThunder = whether or not there was thunder at some point during the day at the destination (1 if there was, 0 if there wasn't)
+- TotalDelay = the amount of time the aircraft was delayed, in minutes (this is our dependent variable)
+
+### The goal
+
+Predict the response TotalDelay as a function of the other variables
+
+### Descriptive Analysis
+
+It is always a good idea to separate from the beginning the training set (what the tool is going to see) from the testing set (used only to validate predictions)
+
+```{r}
+library(tidyverse)
+library(MASS)
+library(caret)
+library(e1071) 
+
+# Loading and preparing data
+Airlines <- read.csv("AirlineDelay.csv", stringsAsFactors = T)
+
+# split between training and testing sets
+spl = createDataPartition(Airlines$TotalDelay, p = 0.8, list = FALSE)  # 80% for training
+
+AirlinesTrain = Airlines[spl,]
+AirlinesTest = Airlines[-spl,]
+
+str(AirlinesTrain)
+
+summary(AirlinesTrain)
+```
+
+Insights?
+
+### Visualization
+
+Add here interesting plots to get information, taking into account the most important variable
+
+```{r}
+# Add here your own graphs
+boxplot(AirlinesTrain$TotalDelay)
+
+```
+
+Half of the observations have a TotalDelay==0
+
+Should we omit those observations?
+
+```{r}
+# AirlinesTrain = filter(AirlinesTrain, TotalDelay>0)
+# AirlinesTest = filter(AirlinesTest, TotalDelay>0)
+```
+
+Any simple idea to predict delays?
+
+```{r}
+# Add here your own idea
+
+```
+
+
+We can even add more visual information:
+
+```{r}
+# TotalDelay vs HistoricallyLate
+ggplot(AirlinesTrain, aes(x=HistoricallyLate, y=log(TotalDelay+10))) +
+  geom_point(alpha=0.8) + ggtitle("TotalDelay vs HistoricallyLate")
+# not a clear relation, maybe some non-linearities?
+
+ggplot(AirlinesTrain, aes(log(TotalDelay+10))) + geom_density(aes(group=Flight, colour=Flight, fill=Flight), alpha=0.1) + 
+  ggtitle("TotalDelay distribution")
+# Not so many differences in the 6 flights, but LAX-ATL has less delays
+
+ggplot(AirlinesTrain, aes(log(TotalDelay+10))) + geom_density(aes(group=Carrier, colour=Carrier, fill=Carrier), alpha=0.1) + 
+  ggtitle("TotalDelay distribution")
+# SkyWest Airlines seems to have more delays
+
+ggplot(AirlinesTrain, aes(x=as.factor(NumPrevFlights), y=log(TotalDelay+10))) + geom_boxplot(fill="blue") +
+  ggtitle("TotalDelay vs NumPrevFlights")
+# number of previous flights seems to increase delay, in a monotic but non-linear way
+
+```
+
+Note for categorical variables it is better to use boxplots
+
+For numerical variables, better scatter plots
+
+And even more plots:
+
+```{r}
+featurePlot(x = AirlinesTrain[, c(9:16)],
+            y = log(AirlinesTrain$TotalDelay+10),
+            plot = "scatter",
+            layout = c(4, 2))
+# insights?
+
+featurePlot(x = AirlinesTrain[, c(17:22)],
+            y = log(AirlinesTrain$TotalDelay+10),
+            plot = "scatter",
+            layout = c(2, 3))
+# insights?
+```
+
+
+# A review of regression
+
+Which are the most correlated variables with Delay?
+
+```{r}
+corr_delay <- sort(cor(AirlinesTrain[,c(5:23)])["TotalDelay",], decreasing = T)
+corr=data.frame(corr_delay)
+ggplot(corr,aes(x = row.names(corr), y = corr_delay)) + 
+  geom_bar(stat = "identity", fill = "lightblue") + 
+  scale_x_discrete(limits= row.names(corr)) +
+  labs(x = "", y = "TotalDelay", title = "Correlations") + 
+  theme(plot.title = element_text(hjust = 0, size = rel(1.5)),
+        axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Insights?
+
+Simple regression: try first the most relevant predictor from previous analysis
+
+```{r}
+# Type here a simple regression model
+
+```
+
+Insights?
+
+### Prediction
+
+```{r}
+# Type here the corresponding prediction in testing
+
+```
+
+Insights?
+
+
+### Multiple regression
+
+If we include more variables in the model, the prediction accuracy could be improved
+
+Try some multiple regression models and compute performance measures in the testing set
+
+```{r}
+linFit <- lm(log(TotalDelay+10) ~ ., data=AirlinesTrain)
+summary(linFit)
+```
+
+Prediction:
+
+```{r}
+pred.log <- predict(linFit, newdata=AirlinesTest)
+cor(log(AirlinesTest$TotalDelay+10), pred.log)^2
+```
+
+Many variables non-significant: high collinearity, not useful to explain (overfitting)
+
+But useful to predict: R2 is roughly 20% in the testing
+
+Other performance measures: MAPE and RMSE
+
+```{r}
+# Error in percentage (mape):
+MAPE = mean(abs(log(AirlinesTest$TotalDelay+10)- pred.log)/log(AirlinesTest$TotalDelay+10))
+MAPE
+
+# Testing residual standard-error:
+RMSE <- sqrt(mean((pred.log - log(AirlinesTest$TotalDelay+10))^2))
+RMSE
+# this is similar to the Residual standard error in summary(linFit) because units are in logs
+
+# This is the RMSE in minutes:
+sqrt(mean(((exp(pred.log)-10) - AirlinesTest$TotalDelay)^2))
+
+```
+
+# Advanced regression models
+
+A basic multiple regression model with interactions:
+
+```{r}
+linFit <- lm(log(TotalDelay+10) ~ OriginAvgWind + OriginPrecip + DestAvgWind + DestPrecip + HistoricallyLate +
+               OriginPrecip:DestPrecip, data=AirlinesTrain)
+
+summary(linFit)
+pred.log <- predict(linFit, newdata=AirlinesTest)
+cor(log(AirlinesTest$TotalDelay+10), pred.log)^2
+
+```
+
+R2 in the training is 10%
+
+R2 in the testing is around 10%
+
+An even more advanced model using categorical variables: for instance, Flight has 6 categories but R creates 5 dummies, why?
+
+Useful to incorporate interactions between categorical variables and numeric ones
+
+```{r}
+linFit <- lm(log(TotalDelay+10) ~ Flight*(OriginAvgWind+OriginPrecip+DestAvgWind+DestPrecip+OriginWindGust+HistoricallyLate)+I(HistoricallyLate^2)+OriginPrecip:DestPrecip, data=AirlinesTrain)
+summary(linFit)
+
+pred.log <- predict(linFit, newdata=AirlinesTest)
+cor(log(AirlinesTest$TotalDelay+10), pred.log)^2
+
+```
+
+R2 in the training is 14%
+
+R2 in the testing is around 14%
+
+Note the multiple regression model including all the variables is still the best
+
+**Important question:** how do we know we are doing well?
+
+Always consider a benchmark model (or a reference)
+
+For instance, we can predict all the new delays as the average delay in the training set
+
+```{r}
+mean(log(AirlinesTrain$TotalDelay+10))
+# This is equivalent to
+benchFit <- lm(log(TotalDelay+10) ~ 1, data=AirlinesTrain)
+pred.bench <- predict(benchFit, newdata=AirlinesTest)
+```
+
+```{r, eval=F}
+cor(log(AirlinesTest$TotalDelay+10), pred.bench)^2
+```
+
+Why cannot we compute the R2?
+
+```{r}
+mean(abs(log(AirlinesTest$TotalDelay+10)- pred.bench)/log(AirlinesTest$TotalDelay+10))
+sqrt(mean((pred.bench - log(AirlinesTest$TotalDelay+10))^2))
+```
+
+The naive prediction is about 10% worse than our best model
+
+# Robust Regression
+
+Choose any of the next models (or any other):
+
+```{r}
+model = log(TotalDelay+10) ~ Flight*(OriginAvgWind+OriginPrecip+DestAvgWind+DestPrecip+OriginWindGust+HistoricallyLate)+I(HistoricallyLate^2)+OriginPrecip:DestPrecip
+
+model = log(TotalDelay+10) ~ .
+
+linFit <- lm(model, data=AirlinesTrain)
+
+```
+
+Residuals
+
+```{r}
+ggplot() + aes(x=AirlinesTrain$HistoricallyLate, y=rstudent(linFit)) + geom_point() + 
+  geom_hline(yintercept=c(-2.33,2.33), color="blue") + theme_minimal()
+```
+
+Some outliers in the top (real delays bigger than expected)
+
+Diagnostic plots: residuals, fitted values, Cook’s distance, and leverage
+
+```{r}
+opar <- par(mfrow = c(2,2), oma = c(0, 0, 1.1, 0))
+plot(linFit, las = 1)
+
+```
+
+Some outliers
+
+Prediction
+
+```{r}
+prLM <- predict(linFit, newdata=AirlinesTest)
+cor(log(AirlinesTest$TotalDelay+10), prLM)^2
+mean(abs(log(AirlinesTest$TotalDelay+10)- prLM)/log(AirlinesTest$TotalDelay+10))
+
+```
+
+
+## Huber estimation
+
+```{r}
+linfit.huber <- rlm(model, data=AirlinesTrain)
+summary(linfit.huber)
+```
+
+Prediction
+
+```{r}
+prHuber <- predict(linfit.huber, newdata=AirlinesTest)
+
+cor(log(AirlinesTest$TotalDelay+10), prHuber)^2
+mean(abs(log(AirlinesTest$TotalDelay+10)- prHuber)/log(AirlinesTest$TotalDelay+10))
+
+```
+
+
+## Bi-square estimation
+
+```{r}
+linfit.bisquare <- rlm(model, data=AirlinesTrain, psi = psi.bisquare)
+summary(linfit.bisquare)
+```
+
+Prediction
+
+```{r}
+prBi <- predict(linfit.bisquare, newdata=AirlinesTest)
+
+cor(log(AirlinesTest$TotalDelay+10), prBi)^2
+mean(abs(log(AirlinesTest$TotalDelay+10)- prBi)/log(AirlinesTest$TotalDelay+10))
+```
+
+Some improvement
+
+When comparing the results of OLS regression with robust regression, if the results are very different, better to use the results from the robust regression: more reliable
+
+Large differences suggest that the model parameters are being highly influenced by outliers
+
+Different loss functions have advantages and drawbacks. Huber weights can have difficulties with severe outliers, and bisquare weights can have difficulties converging or may yield multiple solutions
+
+# An introduction to Caret
+
+Highly recommended package
+
+  - to evaluate performance and calibrate sensitive parameters
+  
+  - to choose the best model across these parameters
+  
+  - to estimate model performance from a training set
+  
+  - Main function: train()
+  
+tidymodels is the tidy version of caret (collection of packages for modelling)
+
+These are the models for regression and classification:
+
+```{r}
+names(getModelInfo()) 
+```
+
+## Tuning
+
+Each model can be automatically tuned and evaluated 
+
+Example: use 5 repeats of 10-fold cross validation
+
+```{r}
+ctrl <- trainControl(method = "repeatedcv", 
+                     repeats = 5,
+                     number = 10)
+```
+
+We can also choose bootstrap, LOOCV, etc.
+
+If we want to fix the hyper-parameters (no tuning), then no trainControl is needed
+
+```{r}
+ctrl <- trainControl(method = "none")
+```
+
+## The train function
+
+This function sets up a grid of tuning parameters for a number of classification and regression routines, fits each model and calculates a resampling based performance measure
+
+Let's first save our predictions and real observations in a data frame
+
+```{r}
+test_results <- data.frame(TotalDelay = log(AirlinesTest$TotalDelay+10))
+
+observed = log(AirlinesTest$TotalDelay+10)
+```
+
+Linear regression with Caret:
+
+```{r}
+lm_tune <- train(log(TotalDelay+10) ~ ., 
+                 data = AirlinesTrain, 
+                 method = "lm", 
+                 preProc=c('scale', 'center'),
+                 trControl = ctrl)
+```
+
+Prediction
+
+```{r}
+test_results$lm <- predict(lm_tune, AirlinesTest)
+
+postResample(pred = test_results$lm,  obs = observed)
+```
+
+Plot
+
+```{r}
+qplot(observed, test_results$lm) +
+  lims(x = c(2, 6), y = c(2, 6)) +
+  geom_abline(intercept = 0, slope = 1, colour = "blue") +
+  ggtitle("Linear Regression Observed VS Predicted")
+```
+
+Robust regression with Caret
+
+Because here we have, we are going to use 5-fold cross validation for tuning
+
+```{r}
+ctrl <- trainControl(method = "repeatedcv", 
+                     number = 5)
+
+# take care: rlm does not work very well with categorical variables
+rlm_tune <- train(log(TotalDelay+10) ~ ., 
+                  data = AirlinesTrain[,c(-1,-2,-3,-4)], 
+                  method = "rlm", 
+                  preProc=c('scale', 'center'),
+                  trControl = ctrl)
+
+rlm_tune
+```
+
+Numerically unstable...
+
+Predict and plot
+
+```{r}
+test_results$rlm <- predict(rlm_tune, AirlinesTest[,c(-1,-2,-3,-4)])
+postResample(pred = test_results$rlm,  obs = observed)
+qplot(observed, test_results$rlm) +
+  lims(x = c(2, 6), y = c(2, 6)) +
+  geom_abline(intercept = 0, slope = 1, colour = "blue") +
+  ggtitle("Robust Regression Observed VS Predicted")
+
+```
+

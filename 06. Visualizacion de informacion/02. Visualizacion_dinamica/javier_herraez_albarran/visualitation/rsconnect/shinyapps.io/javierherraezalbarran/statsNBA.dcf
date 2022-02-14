@@ -1,0 +1,13 @@
+name: statsNBA
+title: statsNBA
+username:
+account: javierherraezalbarran
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 5616947
+bundleId: 5575322
+url: https://javierherraezalbarran.shinyapps.io/statsNBA/
+when: 1644791392.53753
+lastSyncTime: 1644791392.53753
+asMultiple: FALSE
+asStatic: FALSE
