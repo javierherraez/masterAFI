@@ -92,7 +92,7 @@ library(caret)
 library(e1071) 
 
 # Loading and preparing data
-Airlines <- read.csv("AirlineDelay.csv", stringsAsFactors = T)
+Airlines <- read.csv("AirlineDelay.csv", stringsAsFactors=T)
 
 # split between training and testing sets
 spl = createDataPartition(Airlines$TotalDelay, p = 0.8, list = FALSE)  # 80% for training
@@ -112,11 +112,23 @@ Insights?
 Add here interesting plots to get information, taking into account the most important variable
 
 ```{r}
-# Add here your own graphs
+ggplot(AirlinesTrain, aes(TotalDelay)) + geom_density(fill="lightblue") + xlab("TotalDelay") + ggtitle("TotalDelay distribution")
 
 ```
 
-Half of the observations have a TotalDelay==0
+Most of the flights have a delay less than 1 min (Q1=0, Q2=1, Q3=18)
+
+Highly asymmetric distribution
+
+```{r}
+ggplot(AirlinesTrain, aes(log(TotalDelay+10))) + geom_density(fill="lightblue") + xlab("log(TotalDelay+10)") + ggtitle("TotalDelay distribution")
+```
+
+Seems roughly two groups: one with delays less than 7 min (approx) and the other greater (approx)
+
+Or a second group with center (mode) at 10 min
+
+Moreover, half of the observations have a TotalDelay==0
 
 Should we omit those observations?
 
@@ -128,8 +140,8 @@ Should we omit those observations?
 Any simple idea to predict delays?
 
 ```{r}
-# Add here your own idea
-
+# For instance, we can predict all the new delays as the median delay in the training set
+median(AirlinesTrain$TotalDelay)
 ```
 
 
@@ -196,8 +208,8 @@ Insights?
 Simple regression: try first the most relevant predictor from previous analysis
 
 ```{r}
-# Type here a simple regression model
-
+linFit <- lm(log(TotalDelay+10) ~ HistoricallyLate, data=AirlinesTrain)
+summary(linFit)
 ```
 
 Insights?
@@ -205,11 +217,12 @@ Insights?
 ### Prediction
 
 ```{r}
-# Type here the corresponding prediction in testing
-
+# Take care: output is in logs
+predictions <- exp(predict(linFit, newdata=AirlinesTest))-10
+cor(AirlinesTest$TotalDelay, predictions)^2
 ```
 
-Insights?
+Note the $R^2$ in the testing set is now less than that in the training set. Why?
 
 
 ### Multiple regression
@@ -247,7 +260,7 @@ RMSE
 # this is similar to the Residual standard error in summary(linFit) because units are in logs
 
 # This is the RMSE in minutes:
-sqrt(mean(((exp(pred.log)-10) - AirlinesTest$TotalDelay)^2))
+sqrt(mean((predictions - AirlinesTest$TotalDelay)^2))
 
 ```
 
@@ -350,7 +363,9 @@ Prediction
 
 ```{r}
 prLM <- predict(linFit, newdata=AirlinesTest)
+
 cor(log(AirlinesTest$TotalDelay+10), prLM)^2
+
 mean(abs(log(AirlinesTest$TotalDelay+10)- prLM)/log(AirlinesTest$TotalDelay+10))
 
 ```
