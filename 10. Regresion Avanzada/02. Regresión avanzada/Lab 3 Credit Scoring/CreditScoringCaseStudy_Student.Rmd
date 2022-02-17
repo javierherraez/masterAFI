@@ -124,7 +124,7 @@ levels(dataCredit$Creditability)=c("Good", "Bad")
 Split data into training and testing sets 
 
 ```{r}
-in_train <- createDataPartition(dataCredit$Creditability, p = 0.4, list = FALSE)  # 40% for training
+in_train <- createDataPartition(dataCredit$Creditability, p = 0.2, list = FALSE)  # 20% for training
 training <- dataCredit[ in_train,]
 testing <- dataCredit[-in_train,]
 nrow(training)
@@ -273,6 +273,7 @@ Performance: confusion matrix
 
 ```{r}
 # Type your code here for the confusion matrix
+confusionMatrix(prediction, testing$Creditability)
 
 ```
 
@@ -311,7 +312,7 @@ model <- glm(Creditability ~ ., family=binomial(link='logit'), data=training)
 Obtain posterior probabilities and compute the ROC
 
 ```{r}
-probability = predict(model, testing)
+probability = predict(model, testing, type = 'response')
 
 roc.lda <- roc(testing$Creditability,probability)
 auc(roc.lda) 
@@ -434,13 +435,52 @@ for (threshold in seq(0.05,0.5,0.05)){
 }
 
 ```
+```{r}
+#podemos seguir ajustando
+
+profit.i = matrix(NA, nrow = 50, ncol = 6)
+# 50 replicates for training/testing sets for each of the 10 values of threshold
+
+j <- 0
+for (threshold in seq(0.05,0.15,0.02)){
+  #for (p1 in c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8, 0.9)){
+  
+  j <- j + 1
+  cat(j)
+  for(i in 1:50){
+    
+    # partition data intro training (40%) and testing sets (60%)
+    d <- createDataPartition(training$Creditability, p = 0.4, list = FALSE)
+    # select training sample
+    
+    train<-training[d,]
+    test <-training[-d,]  
+    
+    full.model = glm(Creditability ~ ., family=binomial(link='logit'), data=train)
+    
+    # probabilities
+    probability = predict(full.model, test, type="response")
+    
+    # Predictions with a given threshold
+    Cred.pred = rep("Good", nrow(test))
+    Cred.pred[which(probability > threshold)] = "Bad"
+    
+    CM = confusionMatrix(factor(Cred.pred), test$Creditability)$table
+
+    profit.applicant <- sum(profit.unit*CM)/sum(CM)
+    profit.i[i,j] <- profit.applicant
+    
+  }
+}
+
+```
 
 Summary of economic value of predictions
 
 ```{r}
 boxplot(profit.i, main = "Hyper-parameter selection",
         ylab = "unit profit",
-        xlab = "threshold",names = seq(0.05,0.5,0.05),col="royalblue2")
+        xlab = "threshold",names = seq(0.05,0.15,0.02),col="royalblue2")
 
 ```
 
@@ -463,5 +503,9 @@ Cred.pred[which(probability > threshold)] = "Bad"
 CM = confusionMatrix(factor(Cred.pred), testing$Creditability)$table
 profit.applicant <- sum(profit.unit*CM)/sum(CM)
 profit.applicant
+```
+
+```{r}
+profit.applicant*15000*10000
 ```
 
