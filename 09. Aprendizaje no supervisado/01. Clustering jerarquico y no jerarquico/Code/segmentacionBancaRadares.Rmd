@@ -5,16 +5,24 @@ output: html_document
 
 ```{r setup, include=FALSE, echo=FALSE}
 require("knitr")
+library("caret")
+library("dplyr")
 
-opts_knit$set(root.dir = "C:/Proyectos/AFI/cursos_20212022/Regular")
+opts_knit$set(root.dir = "C:/Users/jherraez/Documents/masterAFI/09. Aprendizaje no supervisado/01. Clustering jerarquico y no jerarquico/")
 
-setwd("C:/Proyectos/AFI/cursos_20212022/Regular")
+# setwd("C:/Proyectos/AFI/cursos_20212022/Regular")
+setwd("C:/Users/jherraez/Documents/masterAFI/09. Aprendizaje no supervisado/01. Clustering jerarquico y no jerarquico/")
 
 ####################
 # Lectura de datos #
 ####################
 
-datosBanca <- read.csv("datosBanca.csv", header = TRUE, sep=",")
+datosBanca <- read.csv("Data/datosBanca.csv", header = TRUE, sep=",")
+
+set.seed(1404)
+datosBanca <- datosBanca[sample(nrow(datosBanca), nrow(datosBanca) * 0.8), ]
+rownames(datosBanca) <- 1:nrow(datosBanca)
+
 ```
 
 # Discretización de variables
@@ -27,20 +35,20 @@ summary(datosBanca)
 # install.packages("nima")
 library(nima)
 
-datosBanca$checkingAccount_CAT<-discrete_by_quantile(datosBanca$checkingAccount)/4
-datosBanca$deposit_CAT<-discrete_by_quantile(datosBanca$deposit)/4
-datosBanca$shareOfStock_CAT<-discrete_by_quantile(datosBanca$shareOfStock)/4
-datosBanca$pensionPlan_CAT<-discrete_by_quantile(datosBanca$pensionPlan)/4
+datosBanca$checkingAccount_CAT <- discrete_by_quantile(datosBanca$checkingAccount)/4
+datosBanca$deposit_CAT <- discrete_by_quantile(datosBanca$deposit)/4
+datosBanca$shareOfStock_CAT <- discrete_by_quantile(datosBanca$shareOfStock)/4
+datosBanca$pensionPlan_CAT <- discrete_by_quantile(datosBanca$pensionPlan)/4
 
 #datosBanca$mortgage_CAT<-discrete_by_quantile(datosBanca$mortgage)/4
 # Como da un error, la asignamos con IF
 summary(datosBanca$mortgage)
 
-datosBanca$mortgage_CAT<-datosBanca$mortgage
+datosBanca$mortgage_CAT <- datosBanca$mortgage
 datosBanca$mortgage_CAT <- ifelse(datosBanca$mortgage <= 0, 1, datosBanca$mortgage_CAT)
-datosBanca$mortgage_CAT <- ifelse(0<datosBanca$mortgage & datosBanca$mortgage<= 44752, 2, datosBanca$mortgage_CAT)
-datosBanca$mortgage_CAT <- ifelse(44752<datosBanca$mortgage & datosBanca$mortgage<= 125483, 3, datosBanca$mortgage_CAT)
-datosBanca$mortgage_CAT <- ifelse(125483<datosBanca$mortgage, 4, datosBanca$mortgage_CAT)
+datosBanca$mortgage_CAT <- ifelse(0<datosBanca$mortgage & datosBanca$mortgage<= 45104, 2, datosBanca$mortgage_CAT)
+datosBanca$mortgage_CAT <- ifelse(45104<datosBanca$mortgage & datosBanca$mortgage<= 125979, 3, datosBanca$mortgage_CAT)
+datosBanca$mortgage_CAT <- ifelse(125979<datosBanca$mortgage, 4, datosBanca$mortgage_CAT)
 datosBanca$mortgage_CAT <- datosBanca$mortgage_CAT/4
 summary(datosBanca$mortgage_CAT)
 
@@ -66,6 +74,9 @@ datosBanca$loan_CAT[is.na(datosBanca$loan_CAT)]<-0
 datosBanca$cards_CAT[is.na(datosBanca$cards_CAT)]<-0
 datosBanca$insurance_CAT[is.na(datosBanca$insurance_CAT)]<-0
 datosBanca$billPayment_CAT[is.na(datosBanca$billPayment_CAT)]<-0
+
+datosBanca.cat <- datosBanca %>% 
+  select(ends_with('_CAT'))
 ```
 
 # Cálculo de centroides
@@ -170,3 +181,31 @@ for (i in 4:nrow(centroidesParaRadar)-3)
 
 ```
 
+```{r}
+library(cluster)
+library(factoextra)
+library(vegan)
+library(dendextend)
+
+# fviz_nbclust(x = datosBanca, FUNcluster = kmeans, method = "wss", k.max = 15, 
+#              diss = get_dist(datosBanca, method = "euclidean"), nstart = 3)
+
+datosBanca.cat.subset <- datosBanca.cat[sample(nrow(datosBanca.cat), nrow(datosBanca.cat) * 0.1), ]
+rownames(datosBanca.cat.subset) <- 1:nrow(datosBanca.cat.subset)
+
+matrizDistancias <- vegdist(datosBanca.cat.subset, method = "euclidean")
+clusterJerarquico <- hclust(matrizDistancias, method="ward.D2")
+
+plot(as.dendrogram(clusterJerarquico),  main = "Dendrograma")
+
+rect.hclust(clusterJerarquico, k=2, border="red") 
+rect.hclust(clusterJerarquico, k=3, border="blue") 
+rect.hclust(clusterJerarquico, k=4, border="green") 
+rect.hclust(clusterJerarquico, k=5, border="yellow") 
+rect.hclust(clusterJerarquico, k=6, border="purple") 
+rect.hclust(clusterJerarquico, k=7, border="gray") 
+rect.hclust(clusterJerarquico, k=8, border="black")
+# 
+# dend <- as.dendrogram(clusterJerarquico)
+# dend <- color_branches(dend, k=4) 
+# plot(dend)
