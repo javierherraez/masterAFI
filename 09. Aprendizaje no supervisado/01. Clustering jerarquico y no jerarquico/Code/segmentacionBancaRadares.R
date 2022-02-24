@@ -1,33 +1,44 @@
+require(knitr)
+library(caret)
+library(dplyr)
+library(corrplot)
+library(nima)
+library(cluster)
+library(factoextra)
+library(vegan)
+library(dendextend)
+
 # limpiar espacio de trabajo
 rm(list=ls())
 
 # directorio de trabajo
-setwd("Z:/MDS_F/Aprendizaje no supervisado/Data")
+setwd("C:/Users/jherraez/Documents/masterAFI/09. Aprendizaje no supervisado/01. Clustering jerarquico y no jerarquico/")
 
-datosBanca <- read.csv("datosBanca.csv", header = TRUE, sep=",")
+datosBanca <- read.csv("Data/datosBanca.csv", header = TRUE, sep=",")
 summary(datosBanca)
 
-# Estandarizaci?n mediante discretizaci?n
+set.seed(1404)
+datosBanca <- datosBanca[sample(nrow(datosBanca), nrow(datosBanca) * 0.8), ]
+rownames(datosBanca) <- 1:nrow(datosBanca)
 
-# install.packages("nima")
-library(nima)
 
 datosBanca$checkingAccount_CAT<-discrete_by_quantile(datosBanca$checkingAccount)/4
 datosBanca$deposit_CAT<-discrete_by_quantile(datosBanca$deposit)/4
 datosBanca$shareOfStock_CAT<-discrete_by_quantile(datosBanca$shareOfStock)/4
 datosBanca$pensionPlan_CAT<-discrete_by_quantile(datosBanca$pensionPlan)/4
 
-datosBanca$mortgage_CAT<-discrete_by_quantile(datosBanca$mortgage)/4
+#datosBanca$mortgage_CAT<-discrete_by_quantile(datosBanca$mortgage)/4
 # Como da un error, la asignamos con IF
 summary(datosBanca$mortgage)
 
-datosBanca$mortgage_CAT<-datosBanca$mortgage
+datosBanca$mortgage_CAT <- datosBanca$mortgage
 datosBanca$mortgage_CAT <- ifelse(datosBanca$mortgage <= 0, 1, datosBanca$mortgage_CAT)
-datosBanca$mortgage_CAT <- ifelse(0<datosBanca$mortgage & datosBanca$mortgage<= 44752, 2, datosBanca$mortgage_CAT)
-datosBanca$mortgage_CAT <- ifelse(44752<datosBanca$mortgage & datosBanca$mortgage<= 125483, 3, datosBanca$mortgage_CAT)
-datosBanca$mortgage_CAT <- ifelse(125483<datosBanca$mortgage, 4, datosBanca$mortgage_CAT)
+datosBanca$mortgage_CAT <- ifelse(0 < datosBanca$mortgage & datosBanca$mortgage <= 45104, 2, datosBanca$mortgage_CAT)
+datosBanca$mortgage_CAT <- ifelse(45104 < datosBanca$mortgage & datosBanca$mortgage <= 125979, 3, datosBanca$mortgage_CAT)
+datosBanca$mortgage_CAT <- ifelse(125979 < datosBanca$mortgage, 4, datosBanca$mortgage_CAT)
 datosBanca$mortgage_CAT <- datosBanca$mortgage_CAT/4
 summary(datosBanca$mortgage_CAT)
+
 
 datosBanca$loan_CAT<-discrete_by_quantile(datosBanca$loan)/4
 datosBanca$cards_CAT<-discrete_by_quantile(datosBanca$cards)/4
@@ -37,7 +48,7 @@ datosBanca$billPayment_CAT<-discrete_by_quantile(datosBanca$billPayment)/4
 # La domiciliaci?n de n?mina es binaria y no es preciso estandarizarla
 
 datosBanca$salary_CAT<-as.numeric(datosBanca$salary)
-  
+
 summary(datosBanca)
 
 # Cambiar missings por 0 #
@@ -52,95 +63,88 @@ datosBanca$cards_CAT[is.na(datosBanca$cards_CAT)]<-0
 datosBanca$insurance_CAT[is.na(datosBanca$insurance_CAT)]<-0
 datosBanca$billPayment_CAT[is.na(datosBanca$billPayment_CAT)]<-0
 
-help(cor)
-cor(datosBanca[,12:21],method = c("spearman"))
-# install.packages("sqldf")
-library(sqldf)
+datosBanca.cat <- datosBanca %>% 
+  select(ends_with('_CAT'))
 
-centroideTotalCartera <-  sqldf("Select 
-                        avg(checkingAccount_CAT) as checkingAccount_CAT,
-                        avg(deposit_CAT) as deposit_CAT,
-                        avg(shareOfStock_CAT) as shareOfStock_CAT,
-                        avg(pensionPlan_CAT) as pensionPlan_CAT,
-                        avg(mortgage_CAT) as mortgage_CAT,
-                        avg(loan_CAT) as loan_CAT,
-                        avg(cards_CAT) as cards_CAT,
-                        avg(insurance_CAT) as insurance_CAT,
-                        avg(billPayment_CAT) as billPayment_CAT,
-                        avg(salary_CAT) as salary_CAT
-                        from datosBanca")
+Mcor <- cor(datosBanca.cat,method = c("spearman"))
+corrplot(Mcor, method = 'number')
 
-clientesNominados <- subset(datosBanca,datosBanca$salary==1)
 
-centroideNominados <-  sqldf("Select 
-                        avg(checkingAccount_CAT) as checkingAccount_CAT,
-                        avg(deposit_CAT) as deposit_CAT,
-                        avg(shareOfStock_CAT) as shareOfStock_CAT,
-                        avg(pensionPlan_CAT) as pensionPlan_CAT,
-                        avg(mortgage_CAT) as mortgage_CAT,
-                        avg(loan_CAT) as loan_CAT,
-                        avg(cards_CAT) as cards_CAT,
-                        avg(insurance_CAT) as insurance_CAT,
-                        avg(billPayment_CAT) as billPayment_CAT,
-                        avg(salary_CAT) as salary_CAT
-                        from clientesNominados")
+datosBanca.cat.subset <- datosBanca.cat[sample(nrow(datosBanca.cat), nrow(datosBanca.cat) * 0.1), ]
+rownames(datosBanca.cat.subset) <- 1:nrow(datosBanca.cat.subset)
 
-clientesHipotecados <- subset(datosBanca,datosBanca$mortgage_CAT>0)
 
-centroideHipotecados <-  sqldf("Select 
-                        avg(checkingAccount_CAT) as checkingAccount_CAT,
-                        avg(deposit_CAT) as deposit_CAT,
-                        avg(shareOfStock_CAT) as shareOfStock_CAT,
-                        avg(pensionPlan_CAT) as pensionPlan_CAT,
-                        avg(mortgage_CAT) as mortgage_CAT,
-                        avg(loan_CAT) as loan_CAT,
-                        avg(cards_CAT) as cards_CAT,
-                        avg(insurance_CAT) as insurance_CAT,
-                        avg(billPayment_CAT) as billPayment_CAT,
-                        avg(salary_CAT) as salary_CAT
-                        from clientesHipotecados")
+fviz_nbclust(x = datosBanca.cat.subset, FUNcluster = kmeans, method = "wss", k.max = 15,
+             diss = get_dist(datosBanca.cat.subset, method = "euclidean"), nstart = 3)
 
-clientesInversores <- subset(datosBanca,datosBanca$shareOfStock_CAT>0)
 
-centroideInversores <-  sqldf("Select 
-                        avg(checkingAccount_CAT) as checkingAccount_CAT,
-                        avg(deposit_CAT) as deposit_CAT,
-                        avg(shareOfStock_CAT) as shareOfStock_CAT,
-                        avg(pensionPlan_CAT) as pensionPlan_CAT,
-                        avg(mortgage_CAT) as mortgage_CAT,
-                        avg(loan_CAT) as loan_CAT,
-                        avg(cards_CAT) as cards_CAT,
-                        avg(insurance_CAT) as insurance_CAT,
-                        avg(billPayment_CAT) as billPayment_CAT,
-                        avg(salary_CAT) as salary_CAT
-                        from clientesInversores")
+matrizDistancias <- vegdist(datosBanca.cat.subset, method = "euclidean")
+clusterJerarquico <- hclust(matrizDistancias, method="ward.D2")
 
-centroides<-rbind(centroideTotalCartera,centroideNominados,centroideHipotecados,centroideInversores)
+# 
+# dend <- as.dendrogram(clusterJerarquico)
+# dend <- color_branches(dend, k=8) 
+# plot(dend, leaflab = "none")
 
-# Adjuntamos los l?mites del gr?fico de radar (0 y 1)
-# Esto es necesario para utilizar la funci?n gr?fica de r?dar
-# Tambi?n adjuntamos el comportamiento medio de la cartera
-# para poder comparar cada centroide con la media total
 
-# install.packages("fmsb")
-library(fmsb)
+plot(as.dendrogram(clusterJerarquico),  main = "Dendrograma", leaflab = 'none')
 
-centroidesParaRadar<-rbind(
-  rep(1,10) , 
-  rep(0,10) , 
-  centroides)
+rect.hclust(clusterJerarquico, k=2, border="red") 
+rect.hclust(clusterJerarquico, k=3, border="blue") 
+rect.hclust(clusterJerarquico, k=4, border="green") 
+rect.hclust(clusterJerarquico, k=5, border="yellow") 
+rect.hclust(clusterJerarquico, k=6, border="purple") 
+rect.hclust(clusterJerarquico, k=7, border="gray") 
+rect.hclust(clusterJerarquico, k=8, border="pink")
 
-colors_border=c( rgb(0.2,0.5,0.5,0.9), rgb(0.8,0.2,0.5,0.9) , rgb(0.7,0.5,0.1,0.9) )
-colors_in=c( rgb(0.2,0.5,0.5,0.4), rgb(0.8,0.2,0.5,0.4) , rgb(0.7,0.5,0.1,0.4) )
+calinsky <- cascadeKM(datosBanca.cat.subset, inf.gr = 2, sup.gr = 10, criterion = "calinski")
+calinsky$results
 
-for (i in 3:nrow(centroidesParaRadar)-3)
-{
-  radarchart( as.data.frame(centroidesParaRadar[c(1:3,3+i),])  , axistype=1 , 
-              #custom polygon
-              pcol=colors_border , pfcol=colors_in , plwd=4 , plty=1,
-              #custom the grid
-              cglcol="grey", cglty=1, axislabcol="grey", caxislabels=seq(0,1,5), cglwd=0.8,
-              #custom labels
-              vlcex=0.8
-  )
-}
+kmax <- 30
+asw <- numeric(kmax)
+for(k in 2:kmax){
+  sil <- silhouette(cutree(clusterJerarquico, k = k), matrizDistancias)
+  asw[k] <- summary(sil)$avg.width
+  }
+k.best <- which.max(asw)
+
+plot(1:kmax, asw, type="h", 
+     main = "Silhouette-optimal number of clusters", 
+     xlab = "k (number of groups)", ylab = "Average silhouette width")
+axis(1, k.best, paste("optimum", k.best, sep = "\n"), col = "red", font = 2,
+     col.axis = "red")
+points(k.best, max(asw), pch = 16, col = "red", cex = 1.5)
+
+
+# ---------------
+
+asignacionJerarquica <- cbind(datosBanca.cat.subset, cutree(clusterJerarquico, k = 4))
+
+colnames(asignacionJerarquica)[11] <- "cluster"
+
+centroidesJerarquico <- 
+  asignacionJerarquica %>% 
+  group_by(cluster) %>% 
+  summarise(size = n(),
+            checkingAccount = mean(checkingAccount_CAT),
+            deposit = mean(deposit_CAT),
+            shareOfStock = mean(shareOfStock_CAT),
+            pensionPlan = mean(pensionPlan_CAT),
+            mortgage = mean(mortgage_CAT),
+            loan = mean(loan_CAT),
+            cards = mean(cards_CAT),
+            insurance = mean(insurance_CAT),
+            billPayment = mean(billPayment_CAT),
+            salary = mean(salary_CAT)
+            )
+
+kmeans <- kmeans(datosBanca.cat, centers=centroidesJerarquico[,3:12])
+kmeans$centers
+kmeans$size
+
+fviz_cluster(object = kmeans, data = datosBanca.cat, show.clust.cent = TRUE,
+             ellipse.type = "euclid", star.plot = TRUE, repel = TRUE) +
+  labs(title = "Resultados clustering K-means") +
+  theme_bw() +
+  theme(legend.position = "none")
+
