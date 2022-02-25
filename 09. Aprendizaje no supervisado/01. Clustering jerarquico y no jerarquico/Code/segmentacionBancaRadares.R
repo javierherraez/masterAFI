@@ -7,6 +7,7 @@ library(cluster)
 library(factoextra)
 library(vegan)
 library(dendextend)
+library(fmsb)
 
 # limpiar espacio de trabajo
 rm(list=ls())
@@ -81,26 +82,20 @@ fviz_nbclust(x = datosBanca.cat.subset, FUNcluster = kmeans, method = "wss", k.m
 matrizDistancias <- vegdist(datosBanca.cat.subset, method = "euclidean")
 clusterJerarquico <- hclust(matrizDistancias, method="ward.D2")
 
-# 
-# dend <- as.dendrogram(clusterJerarquico)
-# dend <- color_branches(dend, k=8) 
-# plot(dend, leaflab = "none")
-
 
 plot(as.dendrogram(clusterJerarquico),  main = "Dendrograma", leaflab = 'none')
+for (k in 2:10){
+  rect.hclust(clusterJerarquico, k=k, border=k) 
+}
 
-rect.hclust(clusterJerarquico, k=2, border="red") 
-rect.hclust(clusterJerarquico, k=3, border="blue") 
-rect.hclust(clusterJerarquico, k=4, border="green") 
-rect.hclust(clusterJerarquico, k=5, border="yellow") 
-rect.hclust(clusterJerarquico, k=6, border="purple") 
-rect.hclust(clusterJerarquico, k=7, border="gray") 
-rect.hclust(clusterJerarquico, k=8, border="pink")
-
-calinsky <- cascadeKM(datosBanca.cat.subset, inf.gr = 2, sup.gr = 10, criterion = "calinski")
+calinsky <- cascadeKM(datosBanca.cat.subset, inf.gr = 2, sup.gr = 10, criterion = "calinski", iter = 3)
 calinsky$results
+plot(calinsky)
+plot(calinsky$results[2,], type = 'b', lty=3, xlab="GROUPS", ylab = "CALINSKI", xaxt='n')
+axis(1, seq(1,9), labels = 2:10)
 
-kmax <- 30
+
+kmax <- 15
 asw <- numeric(kmax)
 for(k in 2:kmax){
   sil <- silhouette(cutree(clusterJerarquico, k = k), matrizDistancias)
@@ -122,29 +117,67 @@ asignacionJerarquica <- cbind(datosBanca.cat.subset, cutree(clusterJerarquico, k
 
 colnames(asignacionJerarquica)[11] <- "cluster"
 
+centroideGeneral <- datosBanca.cat %>% 
+  summarise(checkingAccount_CAT = mean(checkingAccount_CAT),
+            deposit_CAT = mean(deposit_CAT),
+            shareOfStock_CAT = mean(shareOfStock_CAT),
+            pensionPlan_CAT = mean(pensionPlan_CAT),
+            mortgage_CAT = mean(mortgage_CAT),
+            loan_CAT = mean(loan_CAT),
+            cards_CAT = mean(cards_CAT),
+            insurance_CAT = mean(insurance_CAT),
+            billPayment_CAT = mean(billPayment_CAT),
+            salary_CAT = mean(salary_CAT)
+  )
+
 centroidesJerarquico <- 
   asignacionJerarquica %>% 
   group_by(cluster) %>% 
   summarise(size = n(),
-            checkingAccount = mean(checkingAccount_CAT),
-            deposit = mean(deposit_CAT),
-            shareOfStock = mean(shareOfStock_CAT),
-            pensionPlan = mean(pensionPlan_CAT),
-            mortgage = mean(mortgage_CAT),
-            loan = mean(loan_CAT),
-            cards = mean(cards_CAT),
-            insurance = mean(insurance_CAT),
-            billPayment = mean(billPayment_CAT),
-            salary = mean(salary_CAT)
+            checkingAccount_CAT = mean(checkingAccount_CAT),
+            deposit_CAT = mean(deposit_CAT),
+            shareOfStock_CAT = mean(shareOfStock_CAT),
+            pensionPlan_CAT = mean(pensionPlan_CAT),
+            mortgage_CAT = mean(mortgage_CAT),
+            loan_CAT = mean(loan_CAT),
+            cards_CAT = mean(cards_CAT),
+            insurance_CAT = mean(insurance_CAT),
+            billPayment_CAT = mean(billPayment_CAT),
+            salary_CAT = mean(salary_CAT)
             )
 
 kmeans <- kmeans(datosBanca.cat, centers=centroidesJerarquico[,3:12])
 kmeans$centers
 kmeans$size
 
-fviz_cluster(object = kmeans, data = datosBanca.cat, show.clust.cent = TRUE,
-             ellipse.type = "euclid", star.plot = TRUE, repel = TRUE) +
+kmeans.subset <- kmeans(datosBanca.cat.subset, centers=centroidesJerarquico[,3:12])
+
+fviz_cluster(object = kmeans.subset, data = datosBanca.cat.subset, show.clust.cent = TRUE,
+             ellipse.type = "euclid", 
+             geom = 'point') +
   labs(title = "Resultados clustering K-means") +
   theme_bw() +
   theme(legend.position = "none")
+
+
+centroidesParaRadar<-rbind(
+  rep(1,10) ,
+  rep(0,10) ,
+  centroideGeneral,
+  kmeans$centers)
+
+colors_border = c( rgb(0.2,0.5,0.5,0.9),rgb(0.14,0.83,0.19,0.9))
+colors_in = c( rgb(0.2,0.5,0.5,0.4), rgb(0.14,0.83,0.19,0.4))
+
+for (i in 4:nrow(centroidesParaRadar)-3){
+  radarchart( as.data.frame(centroidesParaRadar[c(1:3,3+i),]) , axistype=1 ,
+              #custom polygon
+              pcol = colors_border , pfcol = colors_in , plwd=4 , plty=1,
+              #custom the grid
+              cglcol="grey", cglty=1, axislabcol="grey", caxislabels=seq(0,1,5), cglwd=0.8,
+              #custom labels
+              vlcex=0.8
+  )
+}
+
 
