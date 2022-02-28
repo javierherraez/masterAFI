@@ -109,7 +109,7 @@ aggr(churnData, numbers = TRUE, sortVars = TRUE, labels = names(churnData),
 
 11 NAs in TotalCharges, what to do?
 
-```{r, include=F}
+```{r}
 # Insert your code here
 
 churnData <- churnData %>%  dplyr::select(-customerID) %>% drop_na()
@@ -169,7 +169,7 @@ nrow(testing)
 
 There are some variables with high correlations; should skip them
 
-```{r, include=F}
+```{r}
 training$TotalCharges = NULL
 testing$TotalCharges = NULL
 ```
