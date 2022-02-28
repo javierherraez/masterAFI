@@ -13,7 +13,8 @@ library(fmsb)
 rm(list=ls())
 
 # directorio de trabajo
-setwd("C:/Users/jherraez/Documents/masterAFI/09. Aprendizaje no supervisado/01. Clustering jerarquico y no jerarquico/")
+# setwd("C:/Users/jherraez/Documents/masterAFI/09. Aprendizaje no supervisado/01. Clustering jerarquico y no jerarquico/")
+setwd("C:/Users/Javier/Documents/masterAFI/09. Aprendizaje no supervisado/01. Clustering jerarquico y no jerarquico/")
 
 datosBanca <- read.csv("Data/datosBanca.csv", header = TRUE, sep=",")
 summary(datosBanca)
@@ -172,9 +173,9 @@ colors_in = c( rgb(0.2,0.5,0.5,0.4), rgb(0.14,0.83,0.19,0.4))
 for (i in 4:nrow(centroidesParaRadar)-3){
   radarchart( as.data.frame(centroidesParaRadar[c(1:3,3+i),]) , axistype=1 ,
               #custom polygon
-              pcol = colors_border , pfcol = colors_in , plwd=4 , plty=1,
+              pcol = colors_border , pfcol = colors_in , plwd=2 , plty=1,
               #custom the grid
-              cglcol="grey", cglty=1, axislabcol="grey", caxislabels=seq(0,1,5), cglwd=0.8,
+              cglcol="grey", cglty=1, axislabcol="grey", caxislabels=seq(0,1,5),
               #custom labels
               vlcex=0.8
   )
