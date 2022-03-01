@@ -1,0 +1,43 @@
+// RELACIONES
+//----------------------
+
+// Creamos una relación y los nodos que relaciona
+CREATE ()-[:tipo]->();
+
+// Comprobamos si la relación se ha creado correctamente
+MATCH (n) RETURN n;
+
+// Creamos una relación con propiedades y los nodos que relaciona
+CREATE (:Persona { name: 'Miguel' })-[:amigo { desde: '19/01/2006'} ]->(:Persona { name: 'Jose'});
+
+// Comprobamos si la relación se ha creado correctamente
+MATCH (n) RETURN n;
+
+// Creamos una relación en la dirección contraria y los nodos que relaciona
+CREATE (:Persona { name: 'Miguel' })<-[:amigo { desde: '19/01/2006'} ]-(:Persona { name: 'Jose'});
+
+// Comprobamos si la relación se ha creado correctamente
+MATCH (n) RETURN n;
+
+// Creamos dos nodos completos
+CREATE (:Persona { name: 'Juan'}), (:Persona { name: 'María'});
+
+// Creamos una relación sobre nodos existentes
+MATCH
+	(nodo1:Persona { name: 'Juan'}),
+	(nodo2:Persona { name: 'María'})
+CREATE
+	(nodo1)-[:casado_con { desde: '17/06/1954' }]->(nodo2);
+
+// Comprobamos si la relación se ha creado correctamente
+MATCH (n) RETURN n;
+
+// Creamos una relación sobre nodos existentes y la devolvemos
+MATCH
+	(nodo1:Persona { name: 'Daniel'}),
+	(nodo2:Persona { name: 'Carolina'})
+CREATE
+	(nodo1)-[:casado_con { desde: '17/06/1954' }]->(nodo2)
+RETURN nodo1, nodo2;
+
+

@@ -1,0 +1,31 @@
+// CAMINOS
+//----------------------
+
+// Creamos un camino completo desde 0
+CREATE (:Actor)-[:actua_en]->(:Pelicula)<-[:dirige]-(:Director);
+
+// Comprobamos que se ha creado correctamente
+MATCH (n) RETURN n;
+
+// Creamos algunos nodos de prueba
+CREATE (:Actor { name: 'Mark Hamill'}), (:Pelicula {name: 'Start Wars: A new hope'}), (:Director { name: 'George Lucas'});
+
+// Creamos un camino completo sobre nodos existentes
+MATCH
+	(hamill:Actor { name: 'Mark Hamill'}),
+	(episode4:Pelicula { name: 'Star Wars: A new hope'}),
+	(lucas:Director { name: 'George Lucas'})
+CREATE (hamill)-[:actua_en]->(episode4)<-[:dirige]-(lucas);
+
+// Comprobamos que la relación se ha creado con éxito
+MATCH (n) RETURN n;
+
+// Creamos un camino sobre nodos existentes y lo devolvemos
+MATCH
+	(fisher:Actriz { name: 'Carrie Fisher'}),
+	(episode4:Pelicula { name: 'Star Wars: A new hope'}),
+	(lucas:Director { name: 'George Lucas'})
+CREATE
+	p = (fisher)-[:actua_en]->(episode4)<-[:dirige]-(lucas)
+RETURN p;
+

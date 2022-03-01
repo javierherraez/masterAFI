@@ -1,0 +1,24 @@
+# Creación de tablas en el keyspace seleccionado
+CREATE TABLE tabla_prueba (
+	id int,
+	nombre text,
+	activo boolean,
+	PRIMARY KEY (id)
+);
+
+
+# Recuperación del listado completo de tablas
+DESCRIBE tables;
+
+
+# Recuperación de la estructura de una tabla existente
+DESCRIBE tabla_prueba;
+
+
+# Modificación de tablas
+ALTER TABLE tabla_prueba 
+ADD password text;
+
+
+# Eliminación de tablas
+DROP TABLE tabla_prueba;

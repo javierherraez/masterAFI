@@ -1,0 +1,23 @@
+// NODOS
+//----------------------
+
+// Recuperación de todos los nodos de un grafo (y sus relaciones)
+MATCH (n) RETURN n;
+
+// Recuperación de nodos de un grafo (y sus relaciones) limitando resultados
+MATCH (n) RETURN n LIMIT 10;
+
+// Recuperación de todos los nodos de un grafo con una determinada etiqueta
+MATCH (n:Movie) RETURN n;
+
+// Recuperación de todos los nodos de un grafo con una determinada propiedad
+MATCH (n { released: 1996}) RETURN n;
+
+// Recuperación de etiquetas de los nodos
+MATCH (n) RETURN labels(n);
+
+// Recuperación de propiedades de nodos
+MATCH (n:Movie) RETURN n.title;
+
+// Recuperación y alias de propiedades de nodos
+MATCH (n:Movie) RETURN n.title as Título;

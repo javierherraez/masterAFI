@@ -1,0 +1,37 @@
+# Adición de elementos a un conjunto
+SADD conjunto elemento.1
+SADD conjunto elemento.2 elemento.3
+SADD conjunto elemento.1
+
+
+# Recuperación de todos los elementos de un conjunto
+SMEMEBERS conjunto
+
+
+# Recuperación del número de elementos en un conjunto
+SCARD conjunto
+
+
+# Chequeo de existencia de un elemento en un conjunto
+SISMEMBER conjunto elemento.3
+
+
+# Eliminación de elementos de un conjunto
+SREM conjunto elemento.2 elemento.3
+
+
+# Unión de conjuntos
+SADD conjunto1 elemento.4 elemento.1
+SUNION conjunto conjunto1
+SUNIONSTORE conjunto2 conjunto conjunto1
+
+
+# Diferencia de conjuntos
+SDIFF conjunto conjunto1
+SDIFF conjunto1 conjunto
+SDIFFSTORE conjunto2 conjunto conjunto1
+
+
+# Intersección de conjuntos
+SINTER conjunto conjunto1
+SINTERSTORE conjunto2 conjunto conjunto1

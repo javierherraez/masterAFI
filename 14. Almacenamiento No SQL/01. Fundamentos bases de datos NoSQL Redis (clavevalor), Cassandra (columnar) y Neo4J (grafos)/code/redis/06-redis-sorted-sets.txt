@@ -1,0 +1,35 @@
+# Adición de elementos con puntuación de orden a un conjunto
+ZADD conjunto 1 mcorella
+ZADD conjunto 10 jdoe 7 jsmith
+
+
+# Recuperación ordenada de elementos de un conjunto
+ZRANGE conjunto 0 -1
+ZRANGE conjunto 0 7
+ZRANGE conjunto 0 -1 WITHSCORES
+
+
+# Recuperación ordenada de elementos de un conjunto
+ZRANGEBYSCORE conjunto 0 7
+
+
+# Recuperación del número de elementos de un conjunto
+ZCARD conjunto
+
+
+# Recuperación de la posición de un elemento en un conjunto
+ZRANK conjunto jsmith
+
+
+# Recuperación de la puntuación de orden de un elemento de un conjunto
+ZSCORE conjunto jsmith
+
+
+# Eliminación de elementos de un conjunto
+ZREM conjunto jdoe
+
+
+# Incrementa el valor de la puntuación de un elemento
+ZADD trending 1 '#nosql' 1 '#bigdata'
+ZINCRBY trending 10 '#nosql'
+ZINCRBY trending 11 '#bigdata'

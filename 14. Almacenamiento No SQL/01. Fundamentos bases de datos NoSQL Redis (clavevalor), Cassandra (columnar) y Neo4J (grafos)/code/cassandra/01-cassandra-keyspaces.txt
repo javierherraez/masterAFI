@@ -1,0 +1,14 @@
+# Creación de keyspaces
+CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 3}
+
+
+# Listado de keyspaces
+DESCRIBE keyspaces;
+
+
+# Selección de un keyspace
+USE test;
+
+
+# Eliminación de keyspaces
+DROP KEYSPACE test;

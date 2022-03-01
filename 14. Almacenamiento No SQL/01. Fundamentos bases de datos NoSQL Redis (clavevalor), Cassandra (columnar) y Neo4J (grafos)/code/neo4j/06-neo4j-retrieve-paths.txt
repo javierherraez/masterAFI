@@ -1,0 +1,14 @@
+// CAMINOS
+//----------------------
+
+// Recuperción de paths completos
+MATCH p=(:Person { name: 'Tom Hanks'})-[:ACTED_IN]->(:Movie)<-[:ACTED_IN]-(:Person) RETURN p;
+
+// Recupera todos los elementos que están directamente relacionados con un nodo
+MATCH (:Person { name: 'Tom Hanks'})-[rel]-(element) RETURN type(rel), labels(element), element.title;
+
+// Recupera todos los elementos que tienen un nodo como final de la relación
+MATCH (node:Person)-->(matrix:Movie { title: 'The Matrix'}) RETURN node, matrix;
+
+// Recupera todos los elementos que están a un número determinado de saltos en base a una relación
+MATCH (node1:Person)-[:ACTED_IN*2..2]-(node2:Person) RETURN node1.name, node2.name;
