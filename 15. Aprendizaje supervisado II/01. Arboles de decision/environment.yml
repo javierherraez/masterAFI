@@ -1,0 +1,12 @@
+name: ensembles-labs
+dependencies:
+  - jupyter=1.0.*
+  - matplotlib
+  - pandas=1.2.*
+  - pip
+  - py-xgboost=1.5.*
+  - scikit-learn=1.0.*
+  - seaborn
+  - tornado
+  - pip:
+    - shap==0.40.*
