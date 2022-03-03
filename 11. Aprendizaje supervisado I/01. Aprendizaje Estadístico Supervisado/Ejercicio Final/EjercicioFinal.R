@@ -3,56 +3,99 @@ library(caret)
 
 rm(list = ls())
 setwd("C:/Users/jherraez/Documents/masterAFI/11. Aprendizaje supervisado I/01. Aprendizaje Estadístico Supervisado/Ejercicio Final")
-df <- read.csv("BreastCancerData.csv", na.strings = 100)
+genes <- read.csv("BreastCancerData.csv", na.strings = 100, stringsAsFactors = T)
 
-target <- colnames(df)[ncol(df)]
+target <- colnames(genes)[ncol(genes)]
 target
-table(df[, target])
+table(genes[, target])
 
-hist(rowSums(is.na(df)))
-table(rowSums(is.na(df)))
+colnames(genes)[ncol(genes)] <- "Relapse"
+levels(genes$Relapse) <- c("No", "Yes")
 
-hist(colSums(is.na(df)))
-table(colSums(is.na(df)))
+hist(rowSums(is.na(genes)))
+table(rowSums(is.na(genes)))
+
+hist(colSums(is.na(genes)))
+table(colSums(is.na(genes)))
 
 #borrar columnas con todos missing values
 
-nasColumns <- sapply(df, function(x) all(is.na(x)))
+nasColumns <- sapply(genes, function(x) all(is.na(x)))
 
-df <- df[, !(nasColumns)]
-table(rowSums(is.na(df)))
-table(colSums(is.na(df)))
+genes <- genes[, !(nasColumns)]
+table(rowSums(is.na(genes)))
+table(colSums(is.na(genes)))
+
+genes <- genes[!(rowSums(is.na(genes)) > 10000),]
+row.names(genes) <- 1:nrow(genes)
+
+table(colSums(is.na(genes)))
+
+nasColumns_2 <- sapply(genes, function(x) any(is.na(x)))
+genes <- genes[, !(nasColumns_2)]
+
+table(colSums(is.na(genes)))
+
 ####################################################
 
-df <- df[!(rowSums(is.na(df)) > 10000),]
-
-table(colSums(is.na(df)))
-
-nasColumns_2 <- sapply(df, function(x) any(is.na(x)))
-df <- df[, !(nasColumns_2)]
-
-table(colSums(is.na(df)))
-
-genes <- df[, 1:ncol(df)-1]
-
-pca = prcomp(genes, scale=T)
-summary(pca)
-
-
-ctrl <- trainControl(method = "cv", number = 5,
-                     classProbs = TRUE, 
-                     #verboseIter=T,
+ctrl <- trainControl(method = "cv", 
+                     number = 5,
+                     classProbs = TRUE
                     )
 
-pre <- preProcess(df[,1:ncol(df) - 1], method = c("scale","pca"), thresh=0.7)
+pre <- preProcess(genes[,1:ncol(genes) - 1], method = c("pca"), thresh = 0.9)
 
-df_pca <- predict(pre, df)
-df_pca$Class <- as.factor(df_pca$Class)
-levels(df_pca$Class) <- c("No", "Yes")
-
-rdaFit <- train(Class ~ ., 
+rdaFit <- train(Relapse ~ ., 
                 method = "rda",
-                tuneGrid = expand.grid(gamma = seq(0, 1, 0.2), lambda = seq(0, 1, .2)),
+                tuneGrid = expand.grid(gamma = seq(0.1, 1, .1), lambda = seq(0.1, 1, .1)),
                 metric = "Kappa",
-                data = df_pca,
+                data = predict(pre, genes),
                 trControl = ctrl)
+
+ctrl2 = trainControl(method = "cv", 
+                     number = 5, 
+                     classProbs = TRUE, 
+                     preProcOptions = list(thresh = 0.9))
+
+rdaFit2 <- train(Relapse ~ ., 
+                method = "rda",
+                tuneGrid = expand.grid(gamma = seq(0.1, 1, .1), lambda = seq(0.1, 1, .1)),
+                metric = "Kappa",
+                data = genes,
+                trControl = ctrl2,
+                preProcess = c('pca'))
+
+
+########################################################
+
+library(cluster)
+library(vegan)
+library(dplyr)
+
+genes_traspose <- as.data.frame(t(as.matrix(genes)))
+genes_traspose.genes <- as.data.frame(genes_traspose[1:nrow(genes_traspose) - 1,])
+genes_traspose.genes <- as.data.frame(lapply(genes_traspose.genes, function(x) { as.numeric(x)}))
+
+genes_traspsoe.genes.subset <- genes_traspose.genes[sample(nrow(genes_traspose.genes), nrow(genes_traspose.genes) * 0.3), ]
+matrizDistancias <- vegdist(genes_traspsoe.genes.subset, method = "euclidean")
+clusterJerarquico <- hclust(matrizDistancias, method="ward.D2")
+
+kmax <- ncol(genes_traspsoe.genes.subset)
+asw <- numeric(kmax)
+for(k in 2:kmax){
+  sil <- silhouette(cutree(clusterJerarquico, k = k), matrizDistancias)
+  asw[k] <- summary(sil)$avg.width
+}
+k.best <- which.max(asw)
+
+plot(1:kmax, asw, type="h", 
+     main = "Silhouette-optimal number of clusters", 
+     xlab = "k (number of groups)", ylab = "Average silhouette width")
+axis(1, k.best, paste("optimum", k.best, sep = "\n"), col = "red", font = 2,
+     col.axis = "red")
+points(k.best, max(asw), pch = 16, col = "red", cex = 1.5)
+
+asignacionJerarquica <- cbind(genes_traspsoe.genes.subset, cutree(clusterJerarquico, k = 4))
+colnames(asignacionJerarquica)[97] <- "cluster"
+as.data.frame(asignacionJerarquica) %>% group_by(cluster) %>% summarise(across(everything(), list(mean)))
+
