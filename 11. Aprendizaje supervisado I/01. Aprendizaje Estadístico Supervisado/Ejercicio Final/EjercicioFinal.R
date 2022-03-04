@@ -3,7 +3,7 @@ library(caret)
 
 rm(list = ls())
 setwd("C:/Users/jherraez/Documents/masterAFI/11. Aprendizaje supervisado I/01. Aprendizaje Estadístico Supervisado/Ejercicio Final")
-setwd("C:/Users/Javier/Documents/masterAFI/11. Aprendizaje supervisado I/01. Aprendizaje Estadístico Supervisado/Ejercicio Final")
+# setwd("C:/Users/Javier/Documents/masterAFI/11. Aprendizaje supervisado I/01. Aprendizaje Estadístico Supervisado/Ejercicio Final")
 cancer_df <- read.csv("BreastCancerData.csv", na.strings = 100, stringsAsFactors = T)
 
 target <- colnames(cancer_df)[ncol(cancer_df)]
@@ -52,7 +52,8 @@ rdaFit <- train(Relapse ~ .,
                 tuneGrid = expand.grid(gamma = seq(0.1, 1, .1), lambda = seq(0.1, 1, .1)),
                 metric = "Kappa",
                 data = predict(pre, cancer_df),
-                trControl = ctrl)
+                trControl = ctrl,
+                preProcess = c("center", "scale"))
 
 rdaPred = predict(rdaFit, predict(pre, cancer_df))
 confusionMatrix(rdaPred, cancer_df$Relapse)
@@ -67,11 +68,15 @@ library(factoextra)
 
 genes_traspose <- as.data.frame(t(genes))
 
-set.seed(1404)
-genes_traspose.subset <- genes_traspose[sample(nrow(genes_traspose), nrow(genes_traspose) * 0.1), ]
 
-#fviz_nbclust(genes_traspose.subset, pam, method="wss", k.max = 50) + theme_classic()
-pm <- eclust(genes_traspose.subset, FUNcluster="pam", k.max = 50, hc_metric = "euclidean", hc_method = "ward.D2")
+set.seed(1404)
+samples <- createDataPartition(genes_traspose$`1`, p = 0.1, list = FALSE)
+genes_traspose.subset  <- genes_traspose[samples, ]
+
+fviz_nbclust(genes_traspose.subset, pam, method="wss", k.max = 50) + theme_classic()
+# "wss" (for total within sum of square)
+
+pm <- eclust(genes_traspose.subset, FUNcluster="pam", k = 30, hc_metric = "euclidean", hc_method = "ward.D2", graph = F)
 medoids <- rownames(pm$medoids)
 
 cancer_clustering <- cancer_df[, c(medoids, "Relapse")]
@@ -81,7 +86,25 @@ rdaFitClust <- train(Relapse ~ .,
                 tuneGrid = expand.grid(gamma = seq(0.1, 1, .1), lambda = seq(0.1, 1, .1)),
                 metric = "Kappa",
                 data = cancer_clustering,
-                trControl = ctrl)
+                trControl = ctrl,
+                preProcess = c("center", "scale")
+                )
 
 rdaPredClust = predict(rdaFitClust, genes)
 confusionMatrix(rdaPredClust, cancer_df$Relapse)
+
+
+cost.unit <- c(0, 1, 5, 0)
+CM = confusionMatrix(factor(rdaPredClust), cancer_df$Relapse)$table
+cost = sum(as.vector(CM)*cost.unit)/sum(CM)
+cost
+
+threshold <- 0.2
+
+rdaProbClust = predict(rdaFitClust, genes, type="prob")
+rdaPredClust = rep("No", nrow(genes))
+rdaPredClust[which(rdaProbClust[,2] > threshold)] = "Yes"
+
+CM = confusionMatrix(factor(rdaPredClust), cancer_df$Relapse)$table
+cost = sum(as.vector(CM)*cost.unit)/sum(CM)
+cost
