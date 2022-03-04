@@ -3,38 +3,39 @@ library(caret)
 
 rm(list = ls())
 setwd("C:/Users/jherraez/Documents/masterAFI/11. Aprendizaje supervisado I/01. Aprendizaje Estadístico Supervisado/Ejercicio Final")
-genes <- read.csv("BreastCancerData.csv", na.strings = 100, stringsAsFactors = T)
+setwd("C:/Users/Javier/Documents/masterAFI/11. Aprendizaje supervisado I/01. Aprendizaje Estadístico Supervisado/Ejercicio Final")
+cancer_df <- read.csv("BreastCancerData.csv", na.strings = 100, stringsAsFactors = T)
 
-target <- colnames(genes)[ncol(genes)]
+target <- colnames(cancer_df)[ncol(cancer_df)]
 target
-table(genes[, target])
+table(cancer_df[, target])
 
-colnames(genes)[ncol(genes)] <- "Relapse"
-levels(genes$Relapse) <- c("No", "Yes")
+colnames(cancer_df)[ncol(cancer_df)] <- "Relapse"
+levels(cancer_df$Relapse) <- c("No", "Yes")
 
-hist(rowSums(is.na(genes)))
-table(rowSums(is.na(genes)))
+hist(rowSums(is.na(cancer_df)))
+table(rowSums(is.na(cancer_df)))
 
-hist(colSums(is.na(genes)))
-table(colSums(is.na(genes)))
+hist(colSums(is.na(cancer_df)))
+table(colSums(is.na(cancer_df)))
 
 #borrar columnas con todos missing values
 
-nasColumns <- sapply(genes, function(x) all(is.na(x)))
+nasColumns <- sapply(cancer_df, function(x) all(is.na(x)))
 
-genes <- genes[, !(nasColumns)]
-table(rowSums(is.na(genes)))
-table(colSums(is.na(genes)))
+cancer_df <- cancer_df[, !(nasColumns)]
+table(rowSums(is.na(cancer_df)))
+table(colSums(is.na(cancer_df)))
 
-genes <- genes[!(rowSums(is.na(genes)) > 10000),]
-row.names(genes) <- 1:nrow(genes)
+cancer_df <- cancer_df[!(rowSums(is.na(cancer_df)) > 10000),]
+row.names(cancer_df) <- 1:nrow(cancer_df)
 
-table(colSums(is.na(genes)))
+table(colSums(is.na(cancer_df)))
 
-nasColumns_2 <- sapply(genes, function(x) any(is.na(x)))
-genes <- genes[, !(nasColumns_2)]
+nasColumns_2 <- sapply(cancer_df, function(x) any(is.na(x)))
+cancer_df <- cancer_df[, !(nasColumns_2)]
 
-table(colSums(is.na(genes)))
+table(colSums(is.na(cancer_df)))
 
 ####################################################
 
@@ -42,28 +43,19 @@ ctrl <- trainControl(method = "cv",
                      number = 5,
                      classProbs = TRUE
                     )
-
-pre <- preProcess(genes[,1:ncol(genes) - 1], method = c("pca"), thresh = 0.9)
+ 
+genes <- cancer_df[,1:ncol(cancer_df) - 1]
+pre <- preProcess(genes, method = c("pca"), thresh = 0.9)
 
 rdaFit <- train(Relapse ~ ., 
                 method = "rda",
                 tuneGrid = expand.grid(gamma = seq(0.1, 1, .1), lambda = seq(0.1, 1, .1)),
                 metric = "Kappa",
-                data = predict(pre, genes),
+                data = predict(pre, cancer_df),
                 trControl = ctrl)
 
-ctrl2 = trainControl(method = "cv", 
-                     number = 5, 
-                     classProbs = TRUE, 
-                     preProcOptions = list(thresh = 0.9))
-
-rdaFit2 <- train(Relapse ~ ., 
-                method = "rda",
-                tuneGrid = expand.grid(gamma = seq(0.1, 1, .1), lambda = seq(0.1, 1, .1)),
-                metric = "Kappa",
-                data = genes,
-                trControl = ctrl2,
-                preProcess = c('pca'))
+rdaPred = predict(rdaFit, predict(pre, cancer_df))
+confusionMatrix(rdaPred, cancer_df$Relapse)
 
 
 ########################################################
@@ -71,31 +63,25 @@ rdaFit2 <- train(Relapse ~ .,
 library(cluster)
 library(vegan)
 library(dplyr)
+library(factoextra)
 
-genes_traspose <- as.data.frame(t(as.matrix(genes)))
-genes_traspose.genes <- as.data.frame(genes_traspose[1:nrow(genes_traspose) - 1,])
-genes_traspose.genes <- as.data.frame(lapply(genes_traspose.genes, function(x) { as.numeric(x)}))
+genes_traspose <- as.data.frame(t(genes))
 
-genes_traspsoe.genes.subset <- genes_traspose.genes[sample(nrow(genes_traspose.genes), nrow(genes_traspose.genes) * 0.3), ]
-matrizDistancias <- vegdist(genes_traspsoe.genes.subset, method = "euclidean")
-clusterJerarquico <- hclust(matrizDistancias, method="ward.D2")
+set.seed(1404)
+genes_traspose.subset <- genes_traspose[sample(nrow(genes_traspose), nrow(genes_traspose) * 0.1), ]
 
-kmax <- ncol(genes_traspsoe.genes.subset)
-asw <- numeric(kmax)
-for(k in 2:kmax){
-  sil <- silhouette(cutree(clusterJerarquico, k = k), matrizDistancias)
-  asw[k] <- summary(sil)$avg.width
-}
-k.best <- which.max(asw)
+#fviz_nbclust(genes_traspose.subset, pam, method="wss", k.max = 50) + theme_classic()
+pm <- eclust(genes_traspose.subset, FUNcluster="pam", k.max = 50, hc_metric = "euclidean", hc_method = "ward.D2")
+medoids <- rownames(pm$medoids)
 
-plot(1:kmax, asw, type="h", 
-     main = "Silhouette-optimal number of clusters", 
-     xlab = "k (number of groups)", ylab = "Average silhouette width")
-axis(1, k.best, paste("optimum", k.best, sep = "\n"), col = "red", font = 2,
-     col.axis = "red")
-points(k.best, max(asw), pch = 16, col = "red", cex = 1.5)
+cancer_clustering <- cancer_df[, c(medoids, "Relapse")]
 
-asignacionJerarquica <- cbind(genes_traspsoe.genes.subset, cutree(clusterJerarquico, k = 4))
-colnames(asignacionJerarquica)[97] <- "cluster"
-as.data.frame(asignacionJerarquica) %>% group_by(cluster) %>% summarise(across(everything(), list(mean)))
+rdaFitClust <- train(Relapse ~ ., 
+                method = "rda",
+                tuneGrid = expand.grid(gamma = seq(0.1, 1, .1), lambda = seq(0.1, 1, .1)),
+                metric = "Kappa",
+                data = cancer_clustering,
+                trControl = ctrl)
 
+rdaPredClust = predict(rdaFitClust, genes)
+confusionMatrix(rdaPredClust, cancer_df$Relapse)
