@@ -1,0 +1,222 @@
+---
+title: "Ejercicio Final: Análisis Discriminante Lineal, Análisis Discriminante No Lineal, Naïve Bayes"
+author: "Javier Herráez Albarrán"
+output: html_document
+---
+
+```{r include=FALSE}
+library(dplyr)
+library(caret)
+library(cluster)
+library(vegan)
+library(dplyr)
+library(factoextra)
+
+rm(list = ls())
+setwd("C:/Users/Javier/Documents/masterAFI/11. Aprendizaje supervisado I/01. Aprendizaje Estadístico Supervisado/Ejercicio Final")
+cancer_df <- read.csv("BreastCancerData.csv", na.strings = 100, stringsAsFactors = T)
+```
+
+# Objetivo y datos
+
+Este ejercicio consistirá en realizar un modelo que nos permita predecir la recaída o no de pacientes que han tenido cáncer de mama. Para ello contaremos con un dataset que consta de los datos recogidos de 24481 genes a 97 pacientes.
+
+# Exploración y reprocesado
+
+La última columna del dataset es la que indica si el paciente ha recaído o no en la enfermedad. Veremos como se distribuye.
+
+```{r}
+target <- colnames(cancer_df)[ncol(cancer_df)]
+target
+table(cancer_df[, target])
+```
+
+Observamos que existen 46 pacientes con recaída y 51 que no. Tratamos esta columna para simplicarla.
+
+```{r}
+colnames(cancer_df)[ncol(cancer_df)] <- "Relapse"
+levels(cancer_df$Relapse) <- c("No", "Yes")
+```
+
+Vamos a mostrar la distribución de los missing values por files, es decir, por paciente.
+
+```{r}
+hist(rowSums(is.na(cancer_df)))
+table(rowSums(is.na(cancer_df)))
+```
+
+Podemos observar que la mayoría de pacientes tienen unos 300 missings values. Hay un par de pacientes que destacan que tienen respectivamente 2397 y 10896 missings values.
+
+Ahora hacemos lo mismo con las columnas.
+
+```{r}
+hist(colSums(is.na(cancer_df)))
+table(colSums(is.na(cancer_df)))
+```
+
+Vemos que la mayoría de columnas no tienen casi ningún missing values. sin embargo, existen 293 columnas que tienen 97 datos faltantes, es decir, que no tienen ningún dato para ningún paciente. Por lo tanto, procedemos a eliminar estas columnas.
+
+```{r}
+nasColumns <- sapply(cancer_df, function(x) all(is.na(x)))
+
+cancer_df <- cancer_df[, !(nasColumns)]
+table(rowSums(is.na(cancer_df)))
+table(colSums(is.na(cancer_df)))
+```
+
+Tras ello, podemos observar que ahora nuestros pacientes prácticamente no tienen casi ningún missing values a excepción de los dos comentados con anterioridad.
+
+Tras plantearlo, decidimos eliminar la observación del paciente con más de 10000 NAs y una vez hecho esto, eliminar cualquier columna que tenga algún missing value. De esta forma nos quedamos con 96 pacientes y casi 22000 genes.
+
+```{r}
+cancer_df <- cancer_df[!(rowSums(is.na(cancer_df)) > 10000),]
+row.names(cancer_df) <- 1:nrow(cancer_df)
+
+table(colSums(is.na(cancer_df)))
+```
+
+
+```{r}
+nasColumns_2 <- sapply(cancer_df, function(x) any(is.na(x)))
+cancer_df <- cancer_df[, !(nasColumns_2)]
+
+table(colSums(is.na(cancer_df)))
+```
+
+
+```{r}
+genes <- cancer_df[,1:ncol(cancer_df) - 1]
+```
+
+# Regularized discriminant analysis (Shrinkage) con PCA
+
+Vamos a tratar de crear un modelo que mediante RDA nos de solución al problema planteado inicialmente. Decidimos utilizar PCA para reducir la dimensionalidad de nuestros datos. Probamos un primer modelo que utilice tantas componentes como para tener una explicabilidad del 90% de nuestros datos. Además, utilizamos 5-fold cross-validation para entrenar el modelo y añadimos la propiedad prior para indicar que las proporciones de recaída serían del 50%.
+
+```{r, message=FALSE}
+set.seed(1404)
+
+pre <- preProcess(genes, method = c("pca"), thresh = 0.9)
+
+rdaFitPCA <- train(Relapse ~ ., 
+                method = "rda",
+                tuneGrid = expand.grid(gamma = seq(0.1, 1, .1), lambda = seq(0.1, 1, .1)),
+                metric = "Kappa",
+                data = predict(pre, cancer_df),
+                trControl = trainControl(method = "cv", number = 5, classProbs = TRUE),
+                preProcess = c("center", "scale"),
+                prior = c(0.5, 0.5))
+
+rdaFitPCA
+```
+
+Vemos que para maximizar kappa se utiliza gamma = 0.4 y lambda = 0.9 para el que tiene un accuracy del 0.6668421.
+
+# Regularized discriminant analysis (Shrinkage) con Clustering de variables 
+
+Ahora, probaremos a hacer lo mismo pero con selección de variables mediante clustering.
+
+Lo que haremos será trasponer columnas y filas del dataset y utilizar el método PAM de clustering que toma como centros de sus grupos a un elemento de los datos. De esta manera podremos escoger estas variables (medoids) y hacer modelos de RDA con únicamente estas variables.
+
+Primero, tomamos una muestra de nuestras variables y vemos cuantas variables vamos a seleccionar.
+
+```{r}
+genes_traspose <- as.data.frame(t(genes))
+
+set.seed(1404)
+samples <- createDataPartition(genes_traspose$`1`, p = 0.1, list = FALSE)
+genes_traspose.subset  <- genes_traspose[samples, ]
+
+fviz_nbclust(genes_traspose.subset, pam, method="wss", k.max = 50) + theme_classic() # "wss" (for total within sum of square)
+```
+
+Decidimos hacer clustering con 30 grupos, así que tomamos las 30 variables medoids y desarrollamos modelos únicamente con estas variables. Volvemos a utilizar RDA y 5-fold cross validation para entrenamiento.
+
+```{r, message=FALSE}
+pm <- eclust(genes_traspose.subset, FUNcluster="pam", k = 30, hc_metric = "euclidean", hc_method = "ward.D2", graph = F)
+medoids <- rownames(pm$medoids)
+
+cancer_clustering <- cancer_df[, c(medoids, "Relapse")]
+
+rdaFitClust <- train(Relapse ~ .,
+                method = "rda",
+                tuneGrid = expand.grid(gamma = seq(0.1, 1, .1), lambda = seq(0.1, 1, .1)),
+                metric = "Kappa",
+                data = cancer_clustering,
+                trControl = trainControl(method = "cv", number = 5, classProbs = TRUE),
+                preProcess = c("center", "scale")
+                )
+rdaFitClust
+```
+
+Los gamma y lambda para maximizar Kappa son, respectivamente, 0.8 y 0.4 que da un accuracy de 0.6884211.
+
+Por último, vamos a intentar minimizar los falsos negativos, es decir, casos donde el modelo predice que no existe recaída pero en realidad sí que la hay.
+Es difícil, valorar cuanto puede valer acertar y errar en nuestro modelo, pero lo valoraremos de la siguiente manera: acertar la predicción no supone coste ninguno, mientras que le damos coste a los errores de manera que un falso negativo es un 50% más costoso que un falso positivo.
+
+```{r, message=FALSE, warning=FALSE}
+cost.unit <- c(0, 1, 1.5, 0)
+cost.i = matrix(NA, nrow = 50, ncol = 10)
+PnoRno = matrix(NA, nrow = 50, ncol = 10)
+PnoRyes = matrix(NA, nrow = 50, ncol = 10)
+PyesRno = matrix(NA, nrow = 50, ncol = 10)
+PyesRyes = matrix(NA, nrow = 50, ncol = 10)
+accuracy = matrix(NA, nrow = 50, ncol = 10)
+
+# 50 replicates for training/testing sets for each of the 10 values of threshold
+j <- 0
+for (threshold in seq(0.05,0.5,0.05)){
+  j <- j + 1
+  cat(j)
+  for(i in 1:50){
+    d <- createDataPartition(cancer_clustering$Relapse, p = 0.7, list = FALSE)
+    
+    train <- cancer_clustering[d,]
+    test  <- cancer_clustering[-d,]  
+    
+    rdaFit <- train(Relapse ~ ., data = train, method = "rda",
+                    tuneGrid = data.frame(gamma = 0.8, lambda = 0.4), 
+                    preProcess = c("center", "scale"),
+                    trControl = trainControl(method = "none", classProbs = TRUE))
+    
+    rdaProb = predict(rdaFit, test, type="prob")
+    rdaPred = rep("No", nrow(test))
+    rdaPred[which(rdaProb[,2] > threshold)] = "Yes"
+    
+    CM = confusionMatrix(factor(rdaPred), test$Relapse)
+    accuracy[i,j] <- unname(CM$overall['Accuracy'])
+    
+    CM <- CM$table
+    cost = sum(as.vector(CM)*cost.unit)/sum(CM)
+    
+    cost.i[i,j] <- cost
+    PnoRno[i,j] <- CM[1,1]/sum(CM)
+    PnoRyes[i,j] <- CM[1,2]/sum(CM)
+    PyesRno[i,j] <- CM[2,1]/sum(CM)
+    PyesRyes[i,j] <- CM[2,2]/sum(CM)
+    
+  }
+}
+
+boxplot(cost.i, main = "Threshold selection",
+        ylab = "unit cost",
+        xlab = "threshold value",
+        names = seq(0.05,0.5,0.05),col="royalblue2",las=2)
+```
+
+Vemos que podemos tomar como threshold 0.2, es decir, a partir de que la probabilidad de recaída del paciente sea del 20%, lo trataremos como que sí que existe esta recaída.
+
+```{r}
+boxplot(accuracy[,4])
+mean(accuracy[,4])
+```
+
+Vemos que con esta condición tendríamos un accuracy de media del 60%. Además, podemos ver como se van a distribuir nuestras predicciones:
+
+```{r}
+dist <- matrix(c(mean(PnoRno[,4]), mean(PyesRno[,4]), mean(PnoRyes[,4]), mean(PyesRyes[,4])), nrow=2, ncol=2)
+colnames(dist) <- c("Ref No", "Ref Yes")
+rownames(dist) <- c("Pred No", "Pred Yes")
+dist
+```
+
+

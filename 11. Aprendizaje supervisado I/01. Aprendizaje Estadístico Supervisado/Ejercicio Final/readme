@@ -1,3 +1,0 @@
-Está todo preprocesado, los missing values son números 100.
-No hacer train y test, solo cross validation.
-Sí se puede haccer PCA, funciona muy bien, a lo mejor nos tenemos que quedar con 200 componentes, (a lo mejor no 200 pero grande por lo menos)
