@@ -4,13 +4,18 @@ library(tidyverse)
 library(Hmisc)
 library(corrplot)
 library(effects)
+library(caret)
 
 setwd("masterAFI/10. Regresion Avanzada/javier_herraez_albarran_regresion_avanzada/")
+
+set.seed(1404)
 
 booking <- read.csv("hotel_bookings.csv", header = TRUE)
 
 str(booking)
 summary(booking)
+
+prop.table(table(booking$is_canceled))
 
 barplot(colSums(is.na(booking)), las=2)
 
@@ -41,7 +46,8 @@ booking <- booking %>%
 
 booking <- booking %>% 
   mutate(children = children + babies,
-         total_nights = stays_in_week_nights + stays_in_weekend_nights) %>% 
+         total_nights = stays_in_week_nights + stays_in_weekend_nights,
+         previous_cancellations = ifelse(previous_cancellations > 0, 1, 0)) %>% 
   select(-babies, -stays_in_week_nights, -stays_in_weekend_nights)
 
 booking$hotel <- as.factor(booking$hotel)
@@ -50,6 +56,7 @@ booking$is_repeated_guest <- as.factor(booking$is_repeated_guest)
 booking$deposit_type <- as.factor(booking$deposit_type)
 booking$customer_type <- as.factor(booking$customer_type)
 booking$season <- as.factor(booking$season)
+booking$previous_cancellations <- as.factor(booking$previous_cancellations)
 
 str(booking)
 summary(booking)
@@ -66,11 +73,6 @@ booking %>%
   labs(title = "People by customer type", x = "", y = "", col = "")
 
 booking %>% 
-  ggplot(aes(x= customer_type, y = adults + children)) + geom_boxplot() +
-  labs(title = "People by customer type", x = "", y = "", col = "") +
-  coord_cartesian(ylim=c(0,10))
-
-booking %>% 
   ggplot(aes(x= deposit_type, fill = is_canceled)) + geom_bar() +
   labs(title = "Canceled by customer type", x = "", y = "", col = "")
 
@@ -85,9 +87,13 @@ booking %>%
   ggplot(aes(x= is_canceled, y = adr, fill = is_canceled)) + geom_boxplot() +
   labs(title = "ADR - is_cancelled", x = "", y = "", col = "")
 
+booking[(booking$adr > 4000),]
+booking[(booking$adr < 0),]
+booking <- booking[!(booking$adr>4000 | booking$adr < 0),]
+
 booking %>% 
   ggplot(aes(x= is_canceled, y = adr, fill = is_canceled)) + geom_boxplot() +
-  labs(title = "ADR - is_cancelled", x = "", y = "", col = "") +  coord_cartesian(ylim=c(0,600))
+  labs(title = "ADR - is_cancelled", x = "", y = "", col = "")
 
 booking %>% 
   ggplot(aes(x= is_canceled, y = total_nights, fill = is_canceled)) + geom_boxplot() +
@@ -96,6 +102,12 @@ booking %>%
 booking %>% 
   ggplot(aes(x= season, fill = is_canceled)) + geom_bar() +
   labs(title = "Canceled by Season", x = "", y = "", col = "")
+
+booking %>% 
+  ggplot(aes(x= previous_cancellations, fill = is_canceled)) + geom_bar(position = "fill") +
+  labs(title = "Canceled by previous_cancellations", x = "", y = "", col = "")
+table(booking$previous_cancellations, booking$is_canceled)
+
 
 numeric_columns <- unlist(lapply(booking, is.numeric))
 numeric_columns <- booking[, numeric_columns]
@@ -107,8 +119,28 @@ partition <- sort(sample(nrow(booking), nrow(booking)*.7))
 booking.train <- booking[partition,]
 booking.test <- booking[-partition,]
 
-booking.mod <- glm(is_canceled ~ ., family=binomial(link="logit"), data=booking.train) 
-summary(booking.mod)
+mod_general <- glm(is_canceled ~ ., family=binomial(link="logit"), data=booking.train) 
+summary(mod_general)
+cbind(coef(mod_general), confint(mod_general))
+mod_general.predict <- predict(mod_general, newdata = booking.test, type = "response")
+mod_general.predict <- ifelse(mod_general.predict > 0.5, 1, 0)
+confusionMatrix(table(data=mod_general.predict, reference=booking.test$is_canceled))
 
-plot(effect("booking_changes", booking.mod), ci.style="band", rescale.axis=FALSE, multiline=TRUE, ylab="P(released)", rug=FALSE, main="")
+mod_1 <- glm(is_canceled ~ . - hotel - adr +
+               log(adr + 1) +
+               adr:total_nights,
+             family=binomial(link="logit"), data=booking.train) 
+summary(mod_1)
+
+mod_1.predict <- predict(mod_1, newdata = booking.test, type = "response")
+mod_1.predict <- ifelse(mod_1.predict > 0.5, 1, 0)
+confusionMatrix(table(data=mod_1.predict, reference=booking.test$is_canceled))
+
+plot(allEffects(mod_general), ci.style="band", rescale.axis=FALSE, multiline=TRUE, ylab="P(released)", rug=FALSE, main="")
+
+roc.plot(
+  booking.train$is_canceled,
+  mod_1.predict,
+  threshold = seq(0,max(mod_1.predict),0.01)
+)
 
