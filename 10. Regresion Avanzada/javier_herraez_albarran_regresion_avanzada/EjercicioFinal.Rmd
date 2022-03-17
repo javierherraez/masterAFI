@@ -61,7 +61,7 @@ library(corrplot)
 library(effects)
 library(caret)
 
-# setwd("masterAFI/10. Regresion Avanzada/javier_herraez_albarran_regresion_avanzada/")
+setwd("C:/Users/Javier/Documents/masterAFI/10. Regresion Avanzada/javier_herraez_albarran_regresion_avanzada/")
 
 set.seed(1404)
 
@@ -76,6 +76,7 @@ str(booking)
 Vemos la distribución de nuestra variable Target:
 
 ```{r}
+table(booking$is_canceled)
 prop.table(table(booking$is_canceled))
 ```
 
@@ -184,45 +185,40 @@ Podemos sacar ciertas conclusiones de estas gráficas:
 - Los clientes que ya han cancelado con anterioridad suelen volver a cancelar.
 - Los clientes que han tenido reservas y no las han cancelado no suelen cancelar.
 - No es habitual cambios en las reservas.
-- Por tipo de cliente, los que menos cancelan son los de Groupp y los que más los Transient.
+- Por tipo de cliente, los que menos cancelan son los de Group y los que más los Transient.
 - Hay pocas peticiones de parking, y si las hay nunca cancelan la reserva.
 - Normalmente, si tienes peticiones especiales, no cancelas.
 - Por estaciones del año, las cancelaciones no tienen mucha varianza.
-- En cuanto a noches, no se aprecio diferencia entre la gente que cancela y que no.
+- En cuanto a noches, no se aprecia diferencia entre la gente que cancela y que no.
 
+Algo a destacar es que hay reservas sin adultos. Podemos pensar que a lo mejor son reservas de adolescentes que son dados como niños y que podrían existir este tipo de dato. Sin embargo, podemos ver que existen reservas en las que no hay ni adultos ni niños y que por lo tanto, deben ser errores, así que procedemos a eliminarlas. 
 
 ```{r}
 nrow(booking[((booking$adults == 0) & (booking$children == 0)),])
 booking <- booking[!((booking$adults == 0) & (booking$children == 0)),]
 ```
 
+Algo extraño sucede con la columna que indica el tipo de depósito.deposit_type 'Non Refund' y 'is_canceled' están correlacionadas de manera contraria a la intuición. 
+Más del 99 % de las personas que pagaron el monto total de la reserva por adelantado cancelaron.
+todo parece indicar que es un error de los datos, así que vamos a desestimar esta columna.
+
 ```{r}
 table(booking$deposit_type, booking$is_canceled)
 ```
 
-La columna deposit_type 'Non Refund' y 'is_canceled' están correlacionadas de manera contraria a la intuición. 
-Más del 99 % de las personas que pagaron el monto total por adelantado cancelaron.
-Podemos creer que es un error de los datos, así que vamos a desestimar esta columna.
 
 ```{r}
 booking <- booking %>% select(-deposit_type)
 ```
 
+Hemos visto que en la columna adr parece que hay un outlier muy claro pues tiene un valor mayor que 4000 cuando la media está en unos 100. Además, vemos que también parece que existen valores negativos, lo cual es imposible. Vemos que estas anomalías corresponden a únicamente a dos filas, las cuales eliminamos.
 
 ```{r}
-booking %>% 
-  ggplot(aes(x= is_canceled, y = adr, fill = is_canceled)) + geom_boxplot() +
-  labs(title = "ADR - is_cancelled", x = "", y = "", col = "")
-
-```
-
-
-```{r}
-booking[(booking$adr > 4000),]
-booking[(booking$adr < 0),]
+booking[(booking$adr>4000 | booking$adr < 0),]
 booking <- booking[!(booking$adr>4000 | booking$adr < 0),]
 ```
 
+Ahora podemos ver más claramente la relación de adr con el Target y vemos que no parece que haya gran diferencia de precios entre reservas canceladas y sin cancelar.
 
 ```{r}
 booking %>% 
@@ -230,7 +226,7 @@ booking %>%
   labs(title = "is_cancelled - adr", x = "", y = "", col = "")
 ```
 
-
+Mostramos las correlaciones de las variables númericas y vemos que no hay ninguna significativa.
 
 ```{r}
 numeric_columns <- unlist(lapply(booking, is.numeric))
@@ -239,6 +235,18 @@ numeric_columns <- booking[, numeric_columns]
 corrplot(cor(numeric_columns), method='number')
 ```
 
+La última relación que queremos ver antes de empezar a realizar modelos es la que puede existir entre número de personas y el tipo de cliente.
+Vemos que las reservas con muchas personas suelen pertener al tipo Group pero sin embargo, las reservas de todos los grupos se centran en 2-3 personas.
+
+```{r}
+booking %>% 
+  ggplot(aes(x= customer_type, y = adults + children)) + geom_boxplot() +
+  labs(title = "customer_type --- adults + children", x = "", y = "", col = "")
+```
+
+## GLM
+
+Para empezar crearemos una partición de nuestros datos para train y test y elaboraremos un modelo con todos las variables.
 
 ```{r}
 partition <- sort(sample(nrow(booking), nrow(booking)*.7))
@@ -265,15 +273,34 @@ confusionMatrix(table(data=mod_general.predict, reference=booking.test$is_cancel
 
 
 ```{r}
-mod_1 <- glm(is_canceled ~ . - hotel - adr +
-               log(adr + 1) +
-               adr:total_nights,
+mod_1 <- glm(is_canceled ~ .  
+             - adr + log(adr + 1)
+             - adults + log(adults + 1)
+             - total_nights + log(total_nights + 1)
+             ,
              family=binomial(link="logit"), data=booking.train) 
 summary(mod_1)
 
 mod_1.predict <- predict(mod_1, newdata = booking.test, type = "response")
 mod_1.predict <- ifelse(mod_1.predict > 0.5, 1, 0)
 confusionMatrix(table(data=mod_1.predict, reference=booking.test$is_canceled))
+```
+
+```{r}
+mod_2 <- glm(is_canceled ~ 
+               lead_time 
+             + previous_cancellations 
+             + log(adr + 1) 
+             + previous_bookings_not_canceled
+             + booking_changes
+             + total_of_special_requests
+             ,
+             family=binomial(link="logit"), data=booking.train) 
+summary(mod_2)
+# 
+# mod_2.predict <- predict(mod_2, newdata = booking.test, type = "response")
+# mod_2.predict <- ifelse(mod_2.predict > 0.5, 1, 0)
+# confusionMatrix(table(data=mod_2.predict, reference=booking.test$is_canceled))
 ```
 
 
@@ -289,10 +316,6 @@ plot(allEffects(mod_general), ci.style="band", rescale.axis=FALSE, multiline=TRU
 #   mod_1.predict,
 #   threshold = seq(0,max(mod_1.predict),0.01)
 # )
-```
-
-
-```{r}
 ```
 
 
