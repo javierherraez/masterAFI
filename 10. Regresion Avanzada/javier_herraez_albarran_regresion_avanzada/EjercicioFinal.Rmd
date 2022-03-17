@@ -12,7 +12,9 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 
 En este ejercicio contamos con un dataset que almacena reservas de hotel con uan serie de características y nuestro propósito será predecir si un cliente cancelará su reserva o no.
 
-Para ello, contamos con la siguiente información:
+El dataset está dsiponible en: https://www.kaggle.com/jessemostipak/hotel-booking-demand
+
+Para lograr nuestro objetivo contamos con la siguiente información:
 
 - **hotel**: Hotel (H1 = Resort Hotel or H2 = City Hotel)
 - **is_canceled (TARGET)**: Value indicating if the booking was canceled (1) or not (0)
@@ -61,7 +63,7 @@ library(corrplot)
 library(effects)
 library(caret)
 
-setwd("C:/Users/Javier/Documents/masterAFI/10. Regresion Avanzada/javier_herraez_albarran_regresion_avanzada/")
+# setwd("C:/Users/jherraez/Documents/masterAFI/10. Regresion Avanzada/javier_herraez_albarran_regresion_avanzada/")
 
 set.seed(1404)
 
@@ -92,10 +94,10 @@ Vemos que sólo children tiene Nas (sólo 4). Decidimos que significarán que no
 booking[is.na(booking$children),]$children <- 0 
 ```
 
-a continuación, descartamos las variables que creemos que pueden ser no relevantes como datos relacionados con las habitaciones, datos de la agencia, país y algunas de las relacionadas con fechas como puede ser el día del mes.
+A continuación, descartamos las variables que creemos que pueden ser no relevantes como datos relacionados con las habitaciones, datos de la agencia, país y algunas de las relacionadas con fechas como puede ser el día del mes.
 
 ```{r}
-booking <- booking %>% select(-arrival_date_year,
+booking <- booking %>% dplyr::select(-arrival_date_year,
                               -arrival_date_week_number,
                               -arrival_date_day_of_month,
                               -meal,
@@ -133,7 +135,7 @@ booking <- booking %>%
          total_nights = stays_in_week_nights + stays_in_weekend_nights,
          previous_cancellations = ifelse(previous_cancellations > 0, 1, 0),
          previous_bookings_not_canceled = ifelse(previous_bookings_not_canceled > 0, 1, 0)) %>% 
-  select(-arrival_date_month, -babies, -stays_in_week_nights, -stays_in_weekend_nights)
+  dplyr::select(-arrival_date_month, -babies, -stays_in_week_nights, -stays_in_weekend_nights)
 ```
 
 Hacemos conversiones de tipos de datos a factores en variables categóricas.
@@ -208,7 +210,7 @@ table(booking$deposit_type, booking$is_canceled)
 
 
 ```{r}
-booking <- booking %>% select(-deposit_type)
+booking <- booking %>% dplyr::select(-deposit_type)
 ```
 
 Hemos visto que en la columna adr parece que hay un outlier muy claro pues tiene un valor mayor que 4000 cuando la media está en unos 100. Además, vemos que también parece que existen valores negativos, lo cual es imposible. Vemos que estas anomalías corresponden a únicamente a dos filas, las cuales eliminamos.
@@ -261,7 +263,7 @@ summary(mod_general)
 
 
 ```{r}
-cbind(coef(mod_general), confint(mod_general))
+# cbind(coef(mod_general), confint(mod_general))
 ```
 
 
@@ -273,75 +275,21 @@ confusionMatrix(table(data=mod_general.predict, reference=booking.test$is_cancel
 
 
 ```{r}
-mod_1 <- glm(is_canceled ~ .  
-             - adr + log(adr + 1)
-             - adults + log(adults + 1)
-             - total_nights + log(total_nights + 1)
+mod_5 <- glm(is_canceled ~ #. +
+               lead_time * (customer_type + total_nights)
+               + lead_time:season
+               + adr * adults 
+               + is_repeated_guest * previous_cancellations
+               + booking_changes 
+               + total_of_special_requests
              ,
              family=binomial(link="logit"), data=booking.train) 
-summary(mod_1)
-
-mod_1.predict <- predict(mod_1, newdata = booking.test, type = "response")
-mod_1.predict <- ifelse(mod_1.predict > 0.5, 1, 0)
-confusionMatrix(table(data=mod_1.predict, reference=booking.test$is_canceled))
+summary(mod_5)
 ```
-
-```{r}
-mod_2 <- glm(is_canceled ~ 
-               lead_time 
-             + previous_cancellations 
-             + log(adr + 1) 
-             + previous_bookings_not_canceled
-             + booking_changes
-             + total_of_special_requests
-             ,
-             family=binomial(link="logit"), data=booking.train) 
-summary(mod_2)
-# 
-# mod_2.predict <- predict(mod_2, newdata = booking.test, type = "response")
-# mod_2.predict <- ifelse(mod_2.predict > 0.5, 1, 0)
-# confusionMatrix(table(data=mod_2.predict, reference=booking.test$is_canceled))
-```
-
 
 ```{r, fig.width=30, fig.height=30}
-plot(allEffects(mod_general), ci.style="band", rescale.axis=FALSE, multiline=TRUE, ylab="P(released)", rug=FALSE, main="")
+plot(allEffects(mod_5), ci.style="band", rescale.axis=FALSE, multiline=TRUE, ylab="P(released)", rug=FALSE, main="")
 ```
-
-
-```{r}
-# 
-# roc.plot(
-#   booking.train$is_canceled,
-#   mod_1.predict,
-#   threshold = seq(0,max(mod_1.predict),0.01)
-# )
-```
-
-
-```{r}
-```
-
-
-```{r}
-```
-
-
-```{r}
-```
-
-
-```{r}
-```
-
-
-```{r}
-```
-
-
-```{r}
-```
-
 
 ```{r}
 ```
