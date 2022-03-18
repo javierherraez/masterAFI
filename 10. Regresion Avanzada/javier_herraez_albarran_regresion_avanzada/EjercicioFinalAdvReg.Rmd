@@ -1,0 +1,253 @@
+---
+title: "Ejercicio Final - Regresión Avanzada"
+author: "Javier Herráez Albarrán"
+output: html_document
+---
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+El conjunto de datos con el que vamos a trabajar recopila más de 200 indicadores financieros de 2017 para todas las acciones del mercado de valores de EE. UU. Los indicadores financieros son los que se encuentran en las presentaciones 10-K que las empresas que cotizan en bolsa publican anualmente.
+
+La última columna del conjunto de datos representa la clase de cada acción, donde:
+
+si el valor de una acción aumenta durante 2018, entonces class=1;
+si el valor de una acción disminuye durante 2018, entonces class=0.
+En otras palabras, las acciones que pertenecen a la clase 1 son acciones que se deben comprar al comienzo del año 2018 y vender al final del año 2018.
+
+Podemos encontrar este conjunto de datos en https://www.kaggle.com/datasets/cnic92/200-financial-indicators-of-us-stocks-20142018 
+
+
+```{r}
+
+rm(list=ls()) 
+
+library(tidyverse)
+library(VIM)
+library(caret)
+
+setwd("C:/Users/jherraez/Documents/masterAFI/10. Regresion Avanzada/javier_herraez_albarran_regresion_avanzada/")
+
+set.seed(1404)
+
+companies <- read.csv("2017_Financial_Data.csv", header = TRUE)
+
+```
+
+
+```{r}
+ncol(companies)
+nrow(companies)
+```
+Contamos con 225 variables y 4960 compañias.
+
+Lo primero que haremos será eliminar algunas columnas.
+
+- La primera columna: el nombre de la empresa
+- La penúltima columna (PRICE VAR [%]): variación porcentual del precio de cada acción durante el año. La variable target depende directamente de ella ya que, si es positiva, el target es 1, si no, 0.
+
+```{r}
+companies <- companies[-c(1, ncol(companies)-2, ncol(companies)-1)]
+```
+
+
+```{r}
+hist(colSums(is.na(companies)), las=2, breaks = 20)
+ncol
+```
+
+Vamos a eliminar las columnas que por lo menos tengan 2000 missing values (tenemos unas 5000 compañias).
+
+```{r}
+sum(colSums(is.na(companies)) > 2000)
+companies <- companies[!(colSums(is.na(companies)) > 2000)]
+```
+
+
+```{r}
+hist(rowSums(is.na(companies)), las=2, breaks = 20)
+```
+
+Vamos a eliminar también las compañias que tengan por lo menos la mitad de sus variables como missing values (≈ 100).
+
+```{r}
+sum(rowSums(is.na(companies)) > 100)
+companies <- companies[!(rowSums(is.na(companies)) > 100),]
+```
+
+
+```{r}
+for(i in 1:ncol(companies)){
+  companies[is.na(companies[,i]), i] <- mean(companies[,i], na.rm = TRUE)
+}
+```
+
+
+```{r}
+cor_matrix = cor(scale(companies[1:ncol(companies)-1]))
+cor_matrix[is.na(cor_matrix)] <- 0
+high_corr = findCorrelation(cor_matrix, cutoff=0.9) 
+high_corr = sort(high_corr)
+reduced_Data = companies[1:ncol(companies)-1][,-c(high_corr)]
+
+companies = cbind(reduced_Data, ncol(companies))
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
