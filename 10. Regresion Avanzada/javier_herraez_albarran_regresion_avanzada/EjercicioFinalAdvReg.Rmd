@@ -4,140 +4,198 @@ author: "Javier Herráez Albarrán"
 output: html_document
 ---
 
-```{r setup, include=FALSE, warning=FALSE, message=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 ```
 
-## R Markdown
+## Financial Indicators of US stocks 2014
 
-El conjunto de datos con el que vamos a trabajar recopila más de 200 indicadores financieros de 2017 para todas las acciones del mercado de valores de EE. UU. Los indicadores financieros son los que se encuentran en las presentaciones 10-K que las empresas que cotizan en bolsa publican anualmente.
+El conjunto de datos con el que vamos a trabajar recopila más de 200 indicadores financieros de 2014 para todas las acciones del mercado de valores de EE. UU. Los indicadores financieros son los que se encuentran en el formulario 10-K que las empresas que cotizan en bolsa publican anualmente.
 
-La última columna del conjunto de datos representa la clase de cada acción, donde:
+La última columna del conjunto de datos, Class, será nuestra variable Target de modo que:
 
-si el valor de una acción aumenta durante 2018, entonces class=1;
-si el valor de una acción disminuye durante 2018, entonces class=0.
-En otras palabras, las acciones que pertenecen a la clase 1 son acciones que se deben comprar al comienzo del año 2018 y vender al final del año 2018.
+si el valor de una acción aumenta durante 2015, entonces class=1;
+si el valor de una acción disminuye durante 2015, entonces class=0.
+En otras palabras, las acciones que pertenecen a la clase 1 son acciones que se deberían comprar al comienzo del año 2015 y vender al final del año 2015. para obtener beneficios.
 
-Podemos encontrar este conjunto de datos en https://www.kaggle.com/datasets/cnic92/200-financial-indicators-of-us-stocks-20142018 
+Podemos encontrar este conjunto de datos en https://www.kaggle.com/datasets/cnic92/200-financial-indicators-of-us-stocks-20142018
 
+### Data & Exploratory
+
+Lo primero de todo será cargar nuestro dataset:
 
 ```{r}
-
 rm(list=ls()) 
 
 library(tidyverse)
 library(VIM)
 library(caret)
+library(glmnet)
 
-setwd("C:/Users/jherraez/Documents/masterAFI/10. Regresion Avanzada/javier_herraez_albarran_regresion_avanzada/")
+setwd("C:/Users/Javier/Documents/masterAFI/10. Regresion Avanzada/javier_herraez_albarran_regresion_avanzada/")
 
 set.seed(1404)
 
-companies <- read.csv("2017_Financial_Data.csv", header = TRUE)
+companies <- read.csv("2014_Financial_Data.csv", header = TRUE)
 
 ```
 
+Podemos ver el número de variables y de observaciones que tenemos.
 
 ```{r}
 ncol(companies)
 nrow(companies)
 ```
-Contamos con 225 variables y 4960 compañias.
 
-Lo primero que haremos será eliminar algunas columnas.
+Contamos con 225 variables y 3808 compañias.
 
-- La primera columna: el nombre de la empresa
-- La penúltima columna (PRICE VAR [%]): variación porcentual del precio de cada acción durante el año. La variable target depende directamente de ella ya que, si es positiva, el target es 1, si no, 0.
+La variable objetivo se distribuye de la siguiente manera:
 
 ```{r}
-companies <- companies[-c(1, ncol(companies)-2, ncol(companies)-1)]
+table(companies$Class)
 ```
 
+Si leemos la documentación del dataset la variable Class depende directamente de otra variable, 'X2015.PRICE.VAR....', que representa la variación porcentual del precio de cada acción durante el año 2015. Como nuestro Target dependerá del valor de ello, haremos un pequeño exploratorio.
+
+```{r}
+summary(companies$X2015.PRICE.VAR....)
+boxplot(companies$X2015.PRICE.VAR....)
+```
+
+Vemos que para la mayoría de acciones sus precios fluctuan poco, sin embargo, tenemos valores muy anómalos, que nos indican que las acciones de ciertas empresas podrían subir más de un 500.000%. Como estas compañias aparecen de una manera muy poco lógica (los valores más altos incluso sería lógico pensar que son datos mal guardados), vamos a prescindir de ellas para centrarnos en empresas que siguen unas variaciones coherentes. Por lo tanto, vamos a eliminar todas aquellas compañias cuyo precio de las acciones aumente más de un 300%. (25 empresas)
+
+```{r}
+companies[companies$X2015.PRICE.VAR....>300,]
+companies <- companies[companies$X2015.PRICE.VAR....<300,]
+```
+
+También hemos visto que existe alguna empresa cuya acciones pierden más del 100% de su valor, por lo cual será datos erróneos, así que también los eliminamos. (1 empresa)
+
+```{r}
+companies[companies$X2015.PRICE.VAR....< (-100),]
+companies <- companies[companies$X2015.PRICE.VAR....> (-100),]
+```
+
+Tras este proceso procedemos a eliminar alguna columnas:
+
+- La primera columna: el nombre de la empresa
+- La columna que indica el sector al que pertenece la empresa.
+- La penúltima columna, que se trata de 'X2015.PRICE.VAR....'.
+
+Además, covertimos el target en factor.
+
+```{r}
+name_company <- companies[1]
+sector_company <- companies[ncol(companies)-2]
+var_company <- companies[ncol(companies)-1]
+
+companies <- companies[-c(1, ncol(companies)-2, ncol(companies)-1)]
+companies$Class <- as.factor(companies$Class)
+```
+
+Ahoora trataremos con los missing values:
 
 ```{r}
 hist(colSums(is.na(companies)), las=2, breaks = 20)
-ncol
 ```
 
-Vamos a eliminar las columnas que por lo menos tengan 2000 missing values (tenemos unas 5000 compañias).
+Decidimmos eliminar las columnas que tengan un número significativo de NAs, unos 1000 (tenemos unas 4000 compañias), que representan más o menos un 25% de missing values por columna. (eliminamos 26 columnas)
 
 ```{r}
-sum(colSums(is.na(companies)) > 2000)
-companies <- companies[!(colSums(is.na(companies)) > 2000)]
+sum(colSums(is.na(companies)) > 1000)
+companies <- companies[!(colSums(is.na(companies)) > 1000)]
 ```
 
+Ahora hacemos lo mismo con las observaciones, es decir, con las compañias.
 
 ```{r}
 hist(rowSums(is.na(companies)), las=2, breaks = 20)
 ```
 
-Vamos a eliminar también las compañias que tengan por lo menos la mitad de sus variables como missing values (≈ 100).
+Vamos a eliminar también las compañias que tengan por lo menos un cuarto de sus variables como missing values (≈ 50) (eliminamos 230 empresas).
 
 ```{r}
-sum(rowSums(is.na(companies)) > 100)
-companies <- companies[!(rowSums(is.na(companies)) > 100),]
+sum(rowSums(is.na(companies)) > 50)
+companies <- companies[!(rowSums(is.na(companies)) > 50),]
 ```
 
+Procedemos al tratamiento de estos misiing values que los imputaremos con la media de cada columna:
 
 ```{r}
 for(i in 1:ncol(companies)){
-  companies[is.na(companies[,i]), i] <- mean(companies[,i], na.rm = TRUE)
+  if (colnames(companies)[i] != "Class"){
+      companies[is.na(companies[,i]), i] <- mean(companies[,i], na.rm = TRUE)
+  }
 }
+
 ```
 
+El siguiente paso que daremos será eliminar aquellas columnas con muy poca varianza: (eliminaremos una columna)
+
+```{r}
+zerovar <- nearZeroVar(companies)
+companies <- companies[-zerovar]
+```
+
+En nuestro proceso de eliminar columnas para reducir la dimmensión pasaremos a eliminar columnas que tengan alta correlación con otras. Nos ayudaremos de la función findCorrelation que nos indicará que columna eliminar de cada par que tenga alta correlación.
 
 ```{r}
 cor_matrix = cor(scale(companies[1:ncol(companies)-1]))
-cor_matrix[is.na(cor_matrix)] <- 0
-high_corr = findCorrelation(cor_matrix, cutoff=0.9) 
+high_corr = findCorrelation(cor_matrix, cutoff=0.8) 
 high_corr = sort(high_corr)
-reduced_Data = companies[1:ncol(companies)-1][,-c(high_corr)]
 
-companies = cbind(reduced_Data, ncol(companies))
-```
-
-
-```{r}
+companies = companies[,-c(high_corr)] # cuidado, puedo usar estos indices porque Class está en la última posición
 
 ```
 
 
 ```{r}
+partition <- sort(sample(nrow(companies), nrow(companies)*.7))
+
+companies.train <- companies[partition,]
+companies.test <- companies[-partition,]
 
 ```
 
 
 ```{r}
+logit.model <- glmnet(as.matrix(companies.train[,-ncol(companies.train)]),
+                      companies.train$Class, 
+                      family=c("binomial"), 
+                      alpha=0,# 0 = ridge, 1 = lasso
+                      lambda=seq(0, .1, length = 100)
+                      )
+plot(logit.model, xvar="lambda")
+
+```
+
+```{r}
+ridge.cv = cv.glmnet(as.matrix(companies.train[,-ncol(companies.train)]),
+                      companies.train$Class, 
+                      family=c("binomial"))
+plot(ridge.cv)
+
 
 ```
 
 
 ```{r}
+probability <- predict(logit.model, 
+                       as.matrix(companies.test[,-ncol(companies.test)]), 
+                       type='response')
+
+prediction <- as.factor(ifelse(probability > 0.5,1,0))
+
+confusionMatrix(prediction, companies.test$Class)
 
 ```
 
 
 ```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
+plot.roc(companies.test$Class, probability, 
+         col="darkblue", print.auc = TRUE,  auc.polygon=TRUE, grid=c(0.1, 0.2),
+         grid.col=c("green", "red"), max.auc.polygon=TRUE,
+         auc.polygon.col="lightblue", print.thres=TRUE)
 
 ```
 
