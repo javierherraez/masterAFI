@@ -6,9 +6,9 @@
 
 rm(list = ls())
 
-# Se asigna el directorio donde están los datos
+# Se asigna el directorio donde est?n los datos
 
-setwd("C:/Proyectos/UNIVERSIDAD/20212022/SSTT/data")
+setwd("C:/Users/jherraez/Documents/masterAFI/16. Analisis de series temporales/01. Series temporales/datos/")
 
 # Carga de datos
 
@@ -29,10 +29,10 @@ tail(datos)
 datos$FECHA <- as.Date(datos$FECHA, "%m/%d/%Y")
 head(datos)
 
-# [1]. Se representan gráficamente los datos
+# [1]. Se representan gr?ficamente los datos
 ################################################################
 
-install.packages("ggplot2")
+# install.packages("ggplot2")
 library(ggplot2)
 
 ggplot(aes(x= FECHA, y = DEMANDA_GAS), data = datos) + geom_line(color = '#d84519') + 
@@ -45,7 +45,7 @@ ggplot(aes(x= FECHA, y = DEMANDA_GAS), data = datos) + geom_line(color = '#d8451
 datos.ts <- ts(datos$DEMANDA_GAS, frequency=7)
 class(datos.ts)
 
-# [3]. Se divide la muestra en entrenamiento y validación
+# [3]. Se divide la muestra en entrenamiento y validaci?n
 ################################################################
 
 datos.train <- subset(datos, "1996-07-01"<=FECHA & FECHA<="1999-06-30")
@@ -58,10 +58,10 @@ datos.validate.ts <- as.ts(datos.validate$DEMANDA_GAS, frequency=7)
 #      de la serie
 ################################################################
 
-install.packages("tseries")
+#install.packages("tseries")
 library(tseries)
 
-# [5.1] ¿Es estacionaria en media? (¿Hay que diferenciarla?)
+# [5.1] ?Es estacionaria en media? (?Hay que diferenciarla?)
 
 # Test de Dickey-Fuller
 
@@ -69,12 +69,12 @@ adf.test(datos.train.ts, alternative="stationary")
 
 # p-valor bajo < 0.05 -> es estacionaria en media
 
-# [5.2] ¿Es estacionaria en varianza?
+# [5.2] ?Es estacionaria en varianza?
 
-# Se evalúa la necesidad de transformar la serie para hacerla
+# Se eval?a la necesidad de transformar la serie para hacerla
 # estacionaria en varianza
 
-install.packages("MASS")
+# install.packages("MASS")
 library(MASS)
 
 box_cox <- boxcox(DEMANDA_GAS ~ FECHA,
@@ -89,22 +89,22 @@ lambda
 # [5]. Ajuste de un modelo ARIMA a la serie
 ################################################################
 
-# [5.1]. Funciones de autocorrelación simple y parcial
+# [5.1]. Funciones de autocorrelaci?n simple y parcial
 
-acf(datos.train.ts, lag.max = 25, xlab = "Retardo",
-    main= "Función de autocorrelación simple")
+acf(datos.train.ts, lag.max = 50, xlab = "Retardo",
+    main= "Funci?n de autocorrelaci?n simple")
 
 pacf(datos.train.ts, lag.max = 25, xlab = "Retardo",
-     main = "Función de autocorrelación parcial")
+     main = "Funci?n de autocorrelaci?n parcial")
 
-# NOTA: Se puede comprobar que el dato de correlación es
-# prácticamente igual que el obtenido en el gráfico:
+# NOTA: Se puede comprobar que el dato de correlaci?n es
+# pr?cticamente igual que el obtenido en el gr?fico:
 
 # [5.2]. Ajuste de modelo ARIMA
 
 # [5.2.1]. AR(1)
 
-install.packages("forecast")
+# install.packages("forecast")
 library(forecast)
 
 ajuste1 <- Arima(datos.train.ts,
@@ -112,16 +112,16 @@ ajuste1 <- Arima(datos.train.ts,
                  method = "ML")
 ajuste1
 
-# Para ver p-valores de los parámetros
+# Para ver p-valores de los par?metros
 
-install.packages("lmtest")
+# install.packages("lmtest")
 library(lmtest)
 
 coeftest(ajuste1)
 
-# Matriz de correlación de parámetros estimados
+# Matriz de correlaci?n de par?metros estimados
 
-install.packages("caschrono")
+# install.packages("caschrono")
 library(caschrono)
 
 cor.arma(ajuste1)
@@ -136,15 +136,15 @@ Box.test.2(residuals(ajuste1),
 
 graphics.off()
 
-acf(ajuste1$residuals, lag.max = 25, xlab = "Retardo", main="")
+acf(ajuste1$residuals, lag.max = 50, xlab = "Retardo", main="")
 pacf(ajuste1$residuals, lag.max = 25, xlab = "Retardo", main="")
 
-# Los gráficos son muy parecidos a estos, porque como el
-# parámetro del AR está muy cerca de 1, es casi como si
-# hubiésemos diferenciado:
+# Los gr?ficos son muy parecidos a estos, porque como el
+# par?metro del AR est? muy cerca de 1, es casi como si
+# hubi?semos diferenciado:
 
-acf(diff(datos.train.ts))
-pacf(diff(datos.train.ts))
+# acf(diff(datos.train.ts))
+# pacf(diff(datos.train.ts))
 
 ajuste2 <- Arima(datos.train.ts,
                  order = c(1,0,0),
@@ -154,7 +154,7 @@ ajuste2 <- Arima(datos.train.ts,
 ajuste2
 coeftest(ajuste2)
 
-# Matriz de correlación de parámetros estimados
+# Matriz de correlaci?n de par?metros estimados
 
 cor.arma(ajuste2)
 
@@ -179,7 +179,7 @@ ajuste3 <- Arima(datos.train.ts,
 ajuste3
 coeftest(ajuste3)
 
-# Raíz unitaria -> Se reemplaza AR(7) por diferencia estacional
+# Ra?z unitaria -> Se reemplaza AR(7) por diferencia estacional
 
 # [5.2.4]. SARIMA(1,0,0)x(0,1,1)[7]
 
@@ -188,13 +188,13 @@ graphics.off()
 ajuste4 <- Arima(datos.train.ts,
                  order = c(1,0,0),
                  seasonal = list(order = c(0,1,1), period = 7),
-                 #include.constant = T,
+                 include.constant = T, #si quisieras interceptor, normalmente es no significativo y no se pone
                  method = "ML")
 
 ajuste4
 coeftest(ajuste4)
 
-# Matriz de correlación de parámetros estimados
+# Matriz de correlaci?n de par?metros estimados
 
 cor.arma(ajuste4)
 
@@ -214,12 +214,13 @@ pacf(ajuste4$residuals, lag.max=25, xlab="Retardo", main="")
 ajuste5 <- Arima(datos.train.ts,
                  order = c(1,0,0),
                  seasonal = list(order = c(1,1,1), period = 7),
+                 include.constant = T,
                  method = "ML")
 
 ajuste5
 coeftest(ajuste5)
 
-# Matriz de correlación de parámetros estimados
+# Matriz de correlaci?n de par?metros estimados
 
 cor.arma(ajuste5)
 
@@ -239,12 +240,13 @@ pacf(ajuste5$residuals, lag.max=25, xlab="Retardo", main="")
 ajuste6 <- Arima(datos.train.ts,
                  order = c(1,0,2),
                  seasonal = list(order = c(1,1,1), period=7),
+                 include.constant = T,
                  method="ML")
 
 ajuste6
 coeftest(ajuste6)
 
-# Matriz de correlación de parámetros estimados
+# Matriz de correlaci?n de par?metros estimados
 
 cor.arma(ajuste6)
 
@@ -254,6 +256,8 @@ Box.test.2(residuals(ajuste6),
            nlag = c(6,12,18,24,30,36,42,48),
            type="Ljung-Box")
 
+
+
 # MODELO ALTERNATIVO: Se cambia el AR(1) por una diferencia regular
 
 graphics.off()
@@ -261,12 +265,13 @@ graphics.off()
 ajusteAlt <- Arima(datos.train.ts,
                    order = c(0,1,2),
                    seasonal = list(order = c(1,1,1), period=7),
+                   #include.constant = T, la quita Ã©l solo aunque se incluya
                    method="ML")
 
 ajusteAlt
 coeftest(ajusteAlt)
 
-# Matriz de correlación de parámetros estimados
+# Matriz de correlaci?n de par?metros estimados
 
 cor.arma(ajusteAlt)
 
@@ -280,10 +285,10 @@ acf(ajusteAlt$residuals, lag.max=25, xlab="Retardo", main="")
 
 # Residuo antes de incluir intervenciones
 
-acf(ajuste6$residuals, lag.max=25, xlab="Retardo", main="")
+acf(ajuste6$residuals, lag.max=25, xlab="Retardo", main="") # ya no hay casi palitos q se salgan
 pacf(ajuste6$residuals, lag.max=25, xlab="Retardo", main="")
 
-# [6]. Inclusión de variables explicativas
+# [6]. Inclusi?n de variables explicativas
 ################################################################
 
 # Se definen los regresores (festividades y temperaturas)
@@ -291,10 +296,10 @@ pacf(ajuste6$residuals, lag.max=25, xlab="Retardo", main="")
 
 calendario <- datos[,c(-2)]
 
-# Se crean el día de la semana, el mes, etc, y a partir de
+# Se crean el d?a de la semana, el mes, etc, y a partir de
 # ellos se definen los festivos
 
-install.packages("lubridate")
+# install.packages("lubridate")
 library(lubridate)
 
 calendario$diaSemana <- wday(calendario$FECHA)
@@ -303,6 +308,7 @@ calendario$mes <- month(calendario$FECHA)
 
 # Se definen los festivos nacionales
 
+#calendario$p_01ene <- ifelse(calendario$diaMes==1 & calendario$mes==1 & calendario$diaSemana != 1, 1, 0)
 calendario$p_01ene <- ifelse(calendario$diaMes==1 & calendario$mes==1, 1, 0)
 calendario$p_06ene <- ifelse(calendario$diaMes==6 & calendario$mes==1, 1, 0)
 calendario$p_19mar <- ifelse(calendario$diaMes==19 & calendario$mes==3, 1, 0)
@@ -315,10 +321,10 @@ calendario$p_08dic <- ifelse(calendario$diaMes==8 & calendario$mes==12, 1 ,0)
 calendario$p_25dic <- ifelse(calendario$diaMes==25 & calendario$mes==12, 1 ,0)
 
 #######################################
-#     Cálculo de la Semana Santa      #
+#     C?lculo de la Semana Santa      #
 #######################################
 
-# Función Easter de timeDate
+# Funci?n Easter de timeDate
 
 # install.packages("timeDate")
 library(timeDate)
@@ -331,7 +337,7 @@ viernesSanto <- data.frame(FECHA=viernesSanto, viernesSanto=rep(1,length(viernes
 lunesPascua <- domingoResurrecion+1
 lunesPascua <- data.frame(FECHA=lunesPascua, lunesPascua=rep(1,length(lunesPascua)))
 
-# Se añaden a la tabla maestra de fechas
+# Se a?aden a la tabla maestra de fechas
 
 calendario <- merge(x = calendario, y = juevesSanto, by = "FECHA", all.x = TRUE)
 calendario <- merge(x = calendario, y = viernesSanto, by = "FECHA", all.x = TRUE)
@@ -347,7 +353,7 @@ calendario$lunesPascua[is.na(calendario$lunesPascua)] <- 0
 
 calendario$TMAX_1=(dplyr::lag(calendario$TMAX, 1))
 calendario$TMAX_2=(dplyr::lag(calendario$TMAX, 2))
-calendario$TMAX_1[is.na(calendario$TMAX_1)] <- 0
+calendario$TMAX_1[is.na(calendario$TMAX_1)] <- 0 #casi que mejor cargarse el registro que decir que la temp=0
 calendario$TMAX_2[is.na(calendario$TMAX_2)] <- 0
 
 calendario$TMIN_1=(dplyr::lag(calendario$TMIN, 1))
@@ -365,7 +371,7 @@ names(as.data.frame(calendario.train))
 calendario.validate <- subset(calendario,FECHA>"1999-06-30")
 calendario.validate <- as.matrix(calendario.validate[,2:ncol(calendario.validate)])
 
-# Se añaden los festivos al Arima ajustado:
+# Se a?aden los festivos al Arima ajustado:
 
 ajuste6ConFestivos <- Arima(datos.train.ts,
                             order = c(1,0,2),
@@ -395,7 +401,7 @@ Box.test.2(residuals(ajuste6ConFestivos),
            nlag = c(6,12,18,24,30,36,42,48),
            type="Ljung-Box")
 
-# Se añaden las temperaturas al Arima ajustado:
+# Se a?aden las temperaturas al Arima ajustado:
 
 ajuste6ConFestivosYTemperaturas <- Arima(datos.train.ts,
                             order = c(1,0,1),
@@ -460,7 +466,7 @@ Box.test.2(residuals(ajuste6AltConFestivosYTemperaturas),
 
 # El RB del otro parece un poco mejor
 
-# [7]. Identificación de outliers
+# [7]. Identificaci?n de outliers
 ################################################################
 
 install.packages("tsoutliers")
@@ -473,7 +479,7 @@ listaOutliers <- locate.outliers(ajuste6ConFestivosYTemperaturas$residuals,
                                  types = c("AO", "LS", "TC"),cval=5)
 listaOutliers
 
-# Para incluir los outliers. No es necesario porque ya se tenía RB
+# Para incluir los outliers. No es necesario porque ya se ten?a RB
 
 outliers <- outliers(c("AO", "LS", "TC"), c(830, 907, 177))
 outliersVariables <- outliers.effects(outliers, length(ajuste6ConFestivosYTemperaturas$residuals))
@@ -488,7 +494,7 @@ ajusteConOutliers <- Arima(datos.train.ts,
 ajusteConOutliers
 coeftest(ajusteConOutliers)
 
-# [8]. Pintamos la predicción a futuro
+# [8]. Pintamos la predicci?n a futuro
 ################################################################
 
 # [8.1]. Sin festivos:
@@ -497,7 +503,7 @@ horizontePrediccion <- 366
 
 prediccion <- as.data.frame(predict(ajuste6, n.ahead=horizontePrediccion))
 
-# Límites de confianza al 95%
+# L?mites de confianza al 95%
 
 U <- prediccion$pred + 2*prediccion$se
 L <- prediccion$pred - 2*prediccion$se
@@ -512,7 +518,7 @@ prediccionFes <- as.data.frame(predict(ajuste6ConFestivosYTemperaturas,
                                        newxreg = calendario.validate[1:horizontePrediccion,c(3:12,14:15,1:2)],
                                        n.ahead= horizontePrediccion))
 
-# Límites de confianza al 95%
+# L?mites de confianza al 95%
 
 U <- prediccionFes$pred + 2*prediccionFes$se
 L <- prediccionFes$pred - 2*prediccionFes$se
@@ -522,7 +528,7 @@ legend("topleft", c("Actual", "Forecast", "Error Bounds (95% Confidence)"),
        xjust = 0, yjust = 1,
        col=c(1,2,4), lty=c(1,1,2))
 
-# [9]. Cálculo de errores (MAPE)
+# [9]. C?lculo de errores (MAPE)
 ################################################################
 
 # [9.1]. Error in-sampling
@@ -577,17 +583,17 @@ mean(realYPrediccionFut[,"MAPEDiario"])
 
 # 17.92781
 
-# MAPE a 1 día a futuro:
+# MAPE a 1 d?a a futuro:
 
 mean(realYPrediccionFut[1:1,"MAPEDiario"])
 
-# 6.399155 (Anecdótico, poca muestra. Meter en bucle)
+# 6.399155 (Anecd?tico, poca muestra. Meter en bucle)
 
-# MAPE durante los 7 primer días a futuro
+# MAPE durante los 7 primer d?as a futuro
 
 mean(realYPrediccionFut[1:7,"MAPEDiario"])
 
-# 5.289403 (Anecdótico, poca muestra. Meter en bucle)
+# 5.289403 (Anecd?tico, poca muestra. Meter en bucle)
 
 # Incluyendo festivos:
 
@@ -604,17 +610,17 @@ mean(realYPrediccionFutFes[,"MAPEDiario"])
 
 # El error out-of-sampling global disminuye al incluir los festivos.
 
-# MAPE a 1 día a futuro:
+# MAPE a 1 d?a a futuro:
 
 mean(realYPrediccionFutFes[1:1,"MAPEDiario"])
 
-# 6.707075 (Anecdótico, poca muestra. Meter en bucle)
+# 6.707075 (Anecd?tico, poca muestra. Meter en bucle)
 
-# MAPE durante los 7 primer días a futuro
+# MAPE durante los 7 primer d?as a futuro
 
 mean(realYPrediccionFutFes[1:7,"MAPEDiario"])
 
-# 5.57677 (Anecdótico, poca muestra. Meter en bucle)
+# 5.57677 (Anecd?tico, poca muestra. Meter en bucle)
 
 # Incluyendo festivos y temperaturas:
 
@@ -631,14 +637,14 @@ mean(realYPrediccionFutFesTemp[,"MAPEDiario"])
 
 # El error out-of-sampling global disminuye al incluir las temperaturas.
 
-# MAPE a 1 día a futuro:
+# MAPE a 1 d?a a futuro:
 
 mean(realYPrediccionFutFesTemp[1:1,"MAPEDiario"])
 
-# 6.979638 (Anecdótico, poca muestra. Meter en bucle)
+# 6.979638 (Anecd?tico, poca muestra. Meter en bucle)
 
-# MAPE durante los 7 primer días a futuro
+# MAPE durante los 7 primer d?as a futuro
 
 mean(realYPrediccionFutFesTemp[1:7,"MAPEDiario"])
 
-# 6.127714 (Anecdótico, poca muestra. Meter en bucle)
+# 6.127714 (Anecd?tico, poca muestra. Meter en bucle)

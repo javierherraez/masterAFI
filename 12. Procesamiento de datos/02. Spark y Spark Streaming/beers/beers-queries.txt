@@ -1,0 +1,39 @@
+# 1. ¿Cuántas filas hay en el set de datos de cervezas? ¿Y en el de 
+# cervecerías?
+
+
+# 2. ¿Cuál es el nombre de la cerveza que tiene más alcohol? 
+# Devolver sólo un registro y sólo con el nombre.
+
+
+# 3. ¿Cuántas cervezas sin alcohol (con nivel de alcohol a 0) hay en el 
+# set de datos?
+
+
+# 4. ¿Cuál es el peso medio calculado sobre todas las cervezas?
+
+
+# 5. ¿Cuál es el el máximo nivel de alcohol por tipo de cerveza? 
+# Ordena los resultados por nivel de alcohol de mayor a menor.
+
+
+# 6. ¿Cuál es el nombre de la cervecería con la cerveza menos amarga? 
+# Devolver sólo un registro y sólo con el nombre.
+
+
+# 7. ¿Cuál es la cerveza más amarga de Chicago? Devolver sólo un registro 
+# y sólo con el nombre.
+
+
+# 8 .¿Cuál es el estado que tiene más cervezas y cuántas tiene? Devolver sólo 
+# un registro y sólo con las siglas.
+
+
+# 9. ¿Cuál es la desviación estándar de nivel de alcohol, amargor y peso por 
+# ciudad y tipo de cerveza? Ordena los resultados por ciudad y tipo de 
+# cerveza ascendente.
+
+
+# 10. ¿Qué ciudad vende la cerveza con el nombre más largo? Devuelve sólo un 
+# registro con el nombre de la ciudad, el nombre de la cerveza y la longitud 
+# del nombre.

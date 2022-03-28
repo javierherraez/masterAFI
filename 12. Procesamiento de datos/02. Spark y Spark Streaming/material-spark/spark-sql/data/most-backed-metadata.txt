@@ -1,0 +1,12 @@
+0 - id: Identifier
+1 - amt.pledged: Amount pledged
+2 - by: Owner
+3 - category: Category
+4 - currency: Currency
+5 - goal: Goal amount
+6 - location: Free text location
+7 - num.backers: Number of people backing the campaign
+8 - num.backers.tier: Tier distribution for backers
+9 - pledge.tier: Tier distribution pedges
+10 - title: Title of the campaign
+11 - url: URL of the campaign

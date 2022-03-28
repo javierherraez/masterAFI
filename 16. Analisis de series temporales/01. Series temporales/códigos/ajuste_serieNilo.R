@@ -6,13 +6,13 @@
 
 rm(list = ls())
 
-# Se asigna el directorio donde están los datos
+# Se asigna el directorio donde est?n los datos
 
-setwd("C:/Proyectos/UNIVERSIDAD/20212022/SSTT/data")
+setwd("C:/Users/jherraez/Documents/masterAFI/16. Analisis de series temporales/01. Series temporales/datos/")
 
 # Carga de datos
 
-# Se reservan los 10 últimos años para hacer la predicción
+# Se reservan los 10 ?ltimos a?os para hacer la predicci?n
 
 datos <- read.csv("nilo.csv")
 datos.train <- subset(datos, ANYO<1275)
@@ -25,7 +25,7 @@ datos.test <- subset(datos, ANYO>=1275)
 datos.test.ts <- as.ts(datos.test$NIVEL_NILO)
 
 ##############################################
-# [1]. Se representan gráficamente los datos #
+# [1]. Se representan gr?ficamente los datos #
 ##############################################
 
 #install.packages("ggplot2")
@@ -49,9 +49,9 @@ ggplotly(graficoSerie)
 # install.packages("tseries")
 library(tseries)
 
-# [2.1] ¿Es estacionaria en varianza?
+# [2.1] ?Es estacionaria en varianza?
 
-# Se evalúa la necesidad de transformar la serie para hacerla
+# Se eval?a la necesidad de transformar la serie para hacerla
 # estacionaria en varianza
 
 install.packages("MASS")
@@ -61,7 +61,7 @@ box_cox <- boxcox(NIVEL_NILO ~ ANYO,
                   data = datos.train,
                   lambda = c(0, 0.5, 1))
 
-# El valor más alto de la verosimilitu se obtiene para lambda = 0 -> logaritmo
+# El valor m?s alto de la verosimilitu se obtiene para lambda = 0 -> logaritmo
 
 lambda <- box_cox$x[which.max(box_cox$y)]
 lambda
@@ -72,14 +72,14 @@ datos.train.ts <- as.ts(datos.train$LOG_NIVEL_NILO)
 datos.test$LOG_NIVEL_NILO=log(datos.test$NIVEL_NILO)
 datos.test.ts <- as.ts(datos.test$LOG_NIVEL_NILO)
 
-# [2.2] ¿Es estacionaria en media? (¿Hay que diferenciarla?)
+# [2.2] ?Es estacionaria en media? (?Hay que diferenciarla?)
 
 # Test de Dickey-Fuller
 
 library(tseries)
 adf.test(datos.train.ts, alternative="stationary")
 
-# p-value = 0.01 -> Se rechaza la existencia de raíces unitarias
+# p-value = 0.01 -> Se rechaza la existencia de ra?ces unitarias
 
 #############################################
 # [3]. Ajuste de un modelo ARIMA a la serie #
@@ -90,15 +90,15 @@ library(forecast)
 
 graphics.off()
 
-# Funciones de autocorrelación de la serie 
+# Funciones de autocorrelaci?n de la serie 
 
 acf(datos.train.ts, lag.max = 48, xlab = "Retardo",
-    main= "Función de autocorrelación simple")
+    main= "Funci?n de autocorrelaci?n simple")
 
 # MA INFINITO
 
 pacf(datos.train.ts, lag.max = 48, xlab = "Retardo",
-     main = "Función de autocorrelación parcial")
+     main = "Funci?n de autocorrelaci?n parcial")
 
 # AR(1)
 
@@ -107,30 +107,37 @@ ajuste_AR1 <- Arima(datos.train.ts,order = c(1,0,0))
 # install.packages("lmtest")
 library(lmtest)
 
-coeftest(ajuste_AR1)
+# coef diferenciar si 1 entra en (estimaciÃ³n +- 2*std.error)
 
+coeftest(ajuste_AR1)
+ 
 # install.packages("caschrono")
 library(caschrono)
 
 cor.arma(ajuste_AR1)
 
-Box.test.2(residuals(ajuste_AR1),
-           nlag = c(6,12,18,24,30,36,42,48),
-           type="Ljung-Box")
-
 # No hay ruido blanco
 
 graphics.off()
 
-# Funciones de autocorrelación del residuo tras el ajuste de un AR(1)
+# Funciones de autocorrelaci?n del residuo tras el ajuste de un AR(1)
 
 acf(ajuste_AR1$residuals, lag.max = 48, xlab = "Retardo",
-    main= "Función de autocorrelación simple")
+    main= "Funci?n de autocorrelaci?n simple")
+
+# Box.test.2(residuals(ajuste_AR1),
+#            nlag = c(6,12,18,24,30,36,42,48),
+#            type="Ljung-Box")
+
+# intentando que haya ruido blanco
+# si por ejmplo, para 6 el p-valor es pequeÃ±o rechazamos que sea ruido blanco para los 6 primeros valores
+# es decir, que se salen de la banda
+LjungBox(ajuste_AR1$residuals, c(6,12,18,24,30,36,42,48))
 
 # MA(1) -> ARMA(1,1)
 
 pacf(ajuste_AR1$residuals, lag.max = 48, xlab = "Retardo",
-     main = "Función de autocorrelación parcial")
+     main = "Funci?n de autocorrelaci?n parcial")
 
 ajuste_AR1_MA1 <- Arima(datos.train.ts,order = c(1,0,1))
 
@@ -138,25 +145,30 @@ coeftest(ajuste_AR1_MA1)
 
 cor.arma(ajuste_AR1_MA1)
 
-# Correlación alta entre parámetros!
+# Correlaci?n alta entre par?metros!
 
-Box.test.2(residuals(ajuste_AR1_MA1),
-           nlag = c(6,12,18,24,30,36,42,48),
-           type="Ljung-Box")
+# Box.test.2(residuals(ajuste_AR1_MA1),
+#            nlag = c(6,12,18,24,30,36,42,48),
+#            type="Ljung-Box")
+
+
+LjungBox(ajuste_AR1_MA1$residuals, c(6,12,18,24,30,36,42,48))
 
 # Ruido blanco para alfa = 0,01
 
 graphics.off()
 
-# Funciones de autocorrelación del residuo tras el ajuste de un ARMA(1,1)
+# Funciones de autocorrelaci?n del residuo tras el ajuste de un ARMA(1,1)
+
+# miramos acf y pacf, Â¿meter ma2 o ar2?, lo que dice el profesor? meter la q (aunque comprobar las dos) 
 
 acf(ajuste_AR1_MA1$residuals, lag.max = 48, xlab = "Retardo",
-    main= "Función de autocorrelación simple")
+    main= "Funci?n de autocorrelaci?n simple")
 
 # MA(2) -> ARMA(1,2)
 
 pacf(ajuste_AR1_MA1$residuals, lag.max = 48, xlab = "Retardo",
-     main = "Función de autocorrelación parcial")
+     main = "Funci?n de autocorrelaci?n parcial")
 
 # O AR(2) -> ARMA(2,1)
 
@@ -168,8 +180,8 @@ coeftest(ajuste_AR1_MA2)
 
 cor.arma(ajuste_AR1_MA2)
 
-# Podría sugerirse un orden de diferenciación
-# Las correlaciones entre los parámetros no son altas
+# Podr?a sugerirse un orden de diferenciaci?n
+# Las correlaciones entre los par?metros no son altas
 
 Box.test.2(residuals(ajuste_AR1_MA2),
            nlag = c(6,12,18,24,30,36,42,48),
@@ -189,7 +201,7 @@ coeftest(ajuste_AR2_MA1)
 
 cor.arma(ajuste_AR2_MA1)
 
-# Las correlaciones entre los parámetros son muy altas
+# Las correlaciones entre los par?metros son muy altas
 
 Box.test.2(residuals(ajuste_AR2_MA1),
            nlag = c(6,12,18,24,30,36,42,48),
@@ -201,7 +213,7 @@ Box.test.2(residuals(ajuste_AR2_MA1),
 graphics.off()
 
 ###################
-# [4]. Predicción #
+# [4]. Predicci?n #
 ###################
 
 # Error sobre training
@@ -218,7 +230,7 @@ mean(errorTraining$APEDiario)
 
 prediccionTest <- as.data.frame(predict(ajuste_AR1_MA2, n.ahead=10))
 
-# Cálculo de errores
+# C?lculo de errores
 
 errorTest <- cbind(datos.test,prediccionTest)
 errorTest$APEDiario <- abs(100*(errorTest$NIVEL_NILO-exp(errorTest$pred))/errorTest$NIVEL_NILO)
@@ -226,14 +238,14 @@ mean(errorTest$APEDiario)
 
 # 5.290345. A horizonte 1: 4.8874394 #
 
-# Representación gráfica predicción
+# Representaci?n gr?fica predicci?n
 
-# Límites de confianza al 95%
+# L?mites de confianza al 95%
 
 U <- exp(prediccionTest$pred + 1.96*prediccionTest$se)
 L <- exp(prediccionTest$pred - 1.96*prediccionTest$se)
 
-# Se destransforma usando Nelson para que la predicción quede centrada en el intervalo
+# Se destransforma usando Nelson para que la predicci?n quede centrada en el intervalo
 
 datos.pred <- data.frame(ANYO = datos.test$ANYO, 
                          Prediccion = exp(prediccionTest$pred+0.5*prediccionTest$se^2),

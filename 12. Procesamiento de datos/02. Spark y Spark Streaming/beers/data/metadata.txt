@@ -1,0 +1,15 @@
+Fichero beers.csv:
+- row_id: Identificador único de fila
+- abv: Nivel de alcohol de la cerveza
+- ibu: Nivel de amargor de la cerveza
+- id: Identificador único de la cerveza
+- name: Nombre de la cerveza
+- style: Tipo de cerveza
+- brewery_id: Identificador único de cervecería
+- ounces: Peso de la cerveza
+
+Fichero breweries.csv:
+- id: Identificador único de la cervecería
+- name: Nombre de la cervecería
+- city: Ciudad en la que se encuentra la cervecería
+- state: Estado en el que se encuentra la cervecería
