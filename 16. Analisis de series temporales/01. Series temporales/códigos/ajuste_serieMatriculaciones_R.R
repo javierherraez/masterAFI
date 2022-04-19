@@ -8,7 +8,7 @@ rm(list = ls())
 
 # Se asigna el directorio donde est?n los datos
 
-setwd("C:/Users/jherraez/Documents/masterAFI/16. Analisis de series temporales/01. Series temporales/datos/")
+setwd("C:/Users/Javier/Documents/masterAFI/16. Analisis de series temporales/01. Series temporales/datos/")
 
 # Carga de datos
 

@@ -1,5 +1,5 @@
 ---
-title: "Ejercicio Final - Regresión Avanzada"
+title: <span style="color:darkblue">Ejercicio Final - Regresión Avanzada</span>
 author: "Javier Herráez Albarrán"
 output: html_document
 ---
@@ -8,7 +8,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 ```
 
-## Financial Indicators of US stocks 2014
+<h1 style="color:darkblue">Financial Indicators of US stocks 2014</h1>
 
 El conjunto de datos con el que vamos a trabajar recopila más de 200 indicadores financieros de 2014 para todas las acciones del mercado de valores de EE. UU. Los indicadores financieros son los que se encuentran en el formulario 10-K que las empresas que cotizan en bolsa publican anualmente.
 
@@ -20,7 +20,7 @@ En otras palabras, las acciones que pertenecen a la clase 1 son acciones que se 
 
 Podemos encontrar este conjunto de datos en https://www.kaggle.com/datasets/cnic92/200-financial-indicators-of-us-stocks-20142018
 
-### Data & Exploratory
+<h2 style="color:darkblue">Data & Exploratory</h2>
 
 Lo primero de todo será cargar nuestro dataset:
 
@@ -31,6 +31,10 @@ library(tidyverse)
 library(VIM)
 library(caret)
 library(glmnet)
+library(factoextra)
+library(cluster)
+library(pROC)
+library(corrplot)
 
 setwd("C:/Users/Javier/Documents/masterAFI/10. Regresion Avanzada/javier_herraez_albarran_regresion_avanzada/")
 
@@ -65,15 +69,21 @@ boxplot(companies$X2015.PRICE.VAR....)
 Vemos que para la mayoría de acciones sus precios fluctuan poco, sin embargo, tenemos valores muy anómalos, que nos indican que las acciones de ciertas empresas podrían subir más de un 500.000%. Como estas compañias aparecen de una manera muy poco lógica (los valores más altos incluso sería lógico pensar que son datos mal guardados), vamos a prescindir de ellas para centrarnos en empresas que siguen unas variaciones coherentes. Por lo tanto, vamos a eliminar todas aquellas compañias cuyo precio de las acciones aumente más de un 300%. (25 empresas)
 
 ```{r}
-companies[companies$X2015.PRICE.VAR....>300,]
+companies[companies$X2015.PRICE.VAR....>300,'X2015.PRICE.VAR....']
 companies <- companies[companies$X2015.PRICE.VAR....<300,]
 ```
 
 También hemos visto que existe alguna empresa cuya acciones pierden más del 100% de su valor, por lo cual será datos erróneos, así que también los eliminamos. (1 empresa)
 
 ```{r}
-companies[companies$X2015.PRICE.VAR....< (-100),]
+companies[companies$X2015.PRICE.VAR....< (-100),'X2015.PRICE.VAR....']
 companies <- companies[companies$X2015.PRICE.VAR....> (-100),]
+```
+
+Nos quedaría una variable 'X2015.PRICE.VAR....' tal que:
+
+```{r}
+boxplot(companies$X2015.PRICE.VAR....)
 ```
 
 Tras este proceso procedemos a eliminar alguna columnas:
@@ -85,10 +95,7 @@ Tras este proceso procedemos a eliminar alguna columnas:
 Además, covertimos el target en factor.
 
 ```{r}
-name_company <- companies[1]
-sector_company <- companies[ncol(companies)-2]
-var_company <- companies[ncol(companies)-1]
-
+companies_original <- companies
 companies <- companies[-c(1, ncol(companies)-2, ncol(companies)-1)]
 companies$Class <- as.factor(companies$Class)
 ```
@@ -99,11 +106,12 @@ Ahoora trataremos con los missing values:
 hist(colSums(is.na(companies)), las=2, breaks = 20)
 ```
 
-Decidimmos eliminar las columnas que tengan un número significativo de NAs, unos 1000 (tenemos unas 4000 compañias), que representan más o menos un 25% de missing values por columna. (eliminamos 26 columnas)
+Decidimos eliminar las columnas que tengan un número significativo de NAs, unos 1000 (tenemos unas 4000 compañias), que representan más o menos un 25% de missing values por columna. (eliminamos 26 columnas)
 
 ```{r}
+col_nas <- colSums(is.na(companies)) > 1000
 sum(colSums(is.na(companies)) > 1000)
-companies <- companies[!(colSums(is.na(companies)) > 1000)]
+companies <- companies[!col_nas]
 ```
 
 Ahora hacemos lo mismo con las observaciones, es decir, con las compañias.
@@ -115,8 +123,11 @@ hist(rowSums(is.na(companies)), las=2, breaks = 20)
 Vamos a eliminar también las compañias que tengan por lo menos un cuarto de sus variables como missing values (≈ 50) (eliminamos 230 empresas).
 
 ```{r}
-sum(rowSums(is.na(companies)) > 50)
-companies <- companies[!(rowSums(is.na(companies)) > 50),]
+row_nas <- rowSums(is.na(companies)) > 50
+sum(row_nas)
+companies <- companies[!row_nas,]
+
+companies_original <- companies_original[!row_nas,]
 ```
 
 Procedemos al tratamiento de estos misiing values que los imputaremos con la media de cada columna:
@@ -145,9 +156,16 @@ high_corr = findCorrelation(cor_matrix, cutoff=0.8)
 high_corr = sort(high_corr)
 
 companies = companies[,-c(high_corr)] # cuidado, puedo usar estos indices porque Class está en la última posición
+```
+Tras esta reducción de dimensionalidad vemos con cuantas columnas nos hemos quedado.
 
+```{r}
+ncol(companies)
 ```
 
+<h2 style="color:darkblue">Modelos de Regresión Avanzada</h2>
+
+Comenzamos esta sección dividiendo el dataset en train y test para poder verificar el accuracy de nuestros modelos.
 
 ```{r}
 partition <- sort(sample(nrow(companies), nrow(companies)*.7))
@@ -155,41 +173,137 @@ partition <- sort(sample(nrow(companies), nrow(companies)*.7))
 companies.train <- companies[partition,]
 companies.test <- companies[-partition,]
 
+companies_original.train <- companies_original[partition,]
+companies_original.test <- companies_original[-partition,]
+
 ```
 
+En primer lugar, vamos a tratar de hacer un modelo explicativo, por lo que necesitaremos pocas variables para que con éstas podamos explicar los resultados con los que nos vayamos a encontrar.
+
+Teniendo en cuante que no tenemos gran conocimiento de finanzas, para seleccionar una pequeña cantidad de variables que den sentido a un modelo no las vamos a seleccionar mediante un criterio experto del que carecemos sino que, vamos a selecionar 8 de todo nuestro dataset mediante la realización de un clustering de variables:
 
 ```{r}
-logit.model <- glmnet(as.matrix(companies.train[,-ncol(companies.train)]),
-                      companies.train$Class, 
-                      family=c("binomial"), 
-                      alpha=0,# 0 = ridge, 1 = lasso
-                      lambda=seq(0, .1, length = 100)
-                      )
-plot(logit.model, xvar="lambda")
+companies_traspose <- as.data.frame(t(companies.train[-ncol(companies.train)]))
+
+pm <- eclust(companies_traspose, FUNcluster="pam", k = 8, hc_metric = "euclidean", hc_method = "ward.D2", graph = F)
+medoids <- rownames(pm$medoids)
+
+companies_cluster <- companies.train[, c(medoids, "Class")]
 
 ```
+
+Vemos con que variables nos hemos quedado:
 
 ```{r}
-ridge.cv = cv.glmnet(as.matrix(companies.train[,-ncol(companies.train)]),
-                      companies.train$Class, 
-                      family=c("binomial"))
-plot(ridge.cv)
-
-
+medoids
+summary(companies_cluster)
+corrplot(cor(companies_cluster[-9]), method = "number")
 ```
 
+Nos hemos quedado por lo tanto con:
+
+- "Intangibles.to.Total.Assets": ratio de intangibles sobre activos totales.
+- "Property..Plant...Equipment.Net": activos físicos que una empresa no puede liquidar o vender fácilmente
+- "Deposit.Liabilities": depósito pasivo
+- "Retained.earnings..deficit.": déficit acumulado  
+- "Market.Cap": capitalización del mercado                    
+- "Enterprise.Value": valor de la empresa              
+- "Working.Capital": capital de trabajo              
+- "Net.Current.Asset.Value": valor del activo 
+
+Podemos tratar de hacer una primera regresión logística con glm añadiendo alguna interacción como los intangibles con la capitalización de mercado,
+o la capitalización de mercado con activos físicos o el valor del activo.
+
+```{r}
+logit.model <- glm(Class ~ .
+                   + Intangibles.to.Total.Assets:Market.Cap
+                   + Property..Plant...Equipment.Net:Working.Capital
+                   + Working.Capital:Net.Current.Asset.Value
+                   , family=binomial(link='logit'),
+                   data=companies_cluster)
+summary(logit.model)
+```
+
+Vemos que la mayoría de los predictores usados no tiene un p-valor bueno en el modelo y si medimos la variabilidad explicada por el modelo obtenemos únicamente un 2%.
+
+Si tratamos de dar una interpretación a los coeficientes (tomando exponenciales) vemos que nos dan resultados poco relevantes ya que se mantienen todos más o menos con valor 1 a excepción de 'Intangibles.to.Total.Assets' pero ya hemos visto que tenía poca significancia en el modelo:
+
+```{r}
+exp(coef(logit.model))
+```
 
 ```{r}
 probability <- predict(logit.model, 
-                       as.matrix(companies.test[,-ncol(companies.test)]), 
+                       companies.test, 
                        type='response')
 
 prediction <- as.factor(ifelse(probability > 0.5,1,0))
 
 confusionMatrix(prediction, companies.test$Class)
+```
+
+Con este modelo tendríamos un acuracy bastante malo del 57% que es lo que nos devolvería el modelo naif según vemos en la distribución de Class en el set de test. Además, como podemos ver prácticamente todos los valores los predice como 0. 
+
+```{r}
+prop.table(table(companies.test$Class))
+```
+
+
+Para mejorar estas predicciones trataremos de crear un modelo de regresión logística penalizada como puede ser Lasso o Ridge.
+
+Probamos a realizar un primer modelo Ridge con todas las variables de nuestro train.
+
+```{r}
+ridge.model <- glmnet(as.matrix(companies.train[,-ncol(companies.train)]),
+                      companies.train$Class, 
+                      family=c("binomial"), 
+                      alpha=0, # 0 = ridge, 1 = lasso
+                      lambda=seq(0, .1, length = 100)
+                      )
+plot(ridge.model, xvar="lambda")
+```
+
+Para seleccionar el mejor lambda:
+
+```{r}
+ridge.cv = cv.glmnet(as.matrix(companies.train[,-ncol(companies.train)]),
+                      companies.train$Class, 
+                      family=c("binomial"), 
+                      alpha=0, type.measure = "auc")
+plot(ridge.cv)
+```
+
+El lambda que utilizaremos será:
+
+```{r}
+opt.lambda <- ridge.cv$lambda.min
+opt.lambda
 
 ```
 
+Con esto elaboraremos un modelo y su predicción:
+
+
+```{r}
+ridge.model.lambda <- glmnet(as.matrix(companies.train[,-ncol(companies.train)]),
+                      companies.train$Class, 
+                      family=c("binomial"), 
+                      alpha=0,
+                      lambda=opt.lambda
+                      )
+
+probability <- predict(ridge.model.lambda, 
+                       as.matrix(companies.test[,-ncol(companies.train)]), 
+                       type='response')
+
+prediction <- as.factor(ifelse(probability > 0.5,1,0))
+
+confusionMatrix(prediction, companies.test$Class)
+```
+
+Obtenemos un accuracy del 63%, mejorando la predicción del modelo anterior.
+
+Usaremos la curva ROC para hacer una estimación de cual sería el threshold que optimizase las predicciones del modelo.
 
 ```{r}
 plot.roc(companies.test$Class, probability, 
@@ -199,113 +313,64 @@ plot.roc(companies.test$Class, probability,
 
 ```
 
+Obetenemos un área bajo la curva de 0.617.
+
+Podemos ver cual sería el threshold que nos interesaría en la realidad.
+
+Imaginemos que invertimos 100$ en cada acción que nos indica nuestro modelo. Como hemos guardado el dataset original y hemos borrado las mismas filas siempre, aún podemos acceder a la variable X2015.PRICE.VAR.... (que indicaba como variaba cada acción durante el año siguiente). De esta manera podemos prodecir cuanto ganaremos con cada compra de cada acción.
+
+Así creamos un bucle y vemos las predicciones de nuestro modelo.
 
 ```{r}
 
-```
+profit.i = matrix(NA, nrow = 20, ncol = 9)
 
+j <- 0
+for (threshold in seq(0.1,0.9,0.1)){
+  j <- j + 1
+  for(i in 1:20){
+    d <- createDataPartition(companies.train$Class, p = 0.4, list = FALSE)
+    
+    train <- companies.train[d,]
+    test <- companies.train[-d,]
+    train_original <- companies_original.train[d,]
+    test_original <- companies_original.train[-d,]
+    
+    full.model = ridge.model.lambda <- glmnet(as.matrix(train[,-ncol(train)]),
+                      train$Class, 
+                      family=c("binomial"), 
+                      alpha=0,
+                      lambda=opt.lambda
+                      )
+    
+    # probabilities
+    probability = predict(full.model, 
+                          as.matrix(test[,-ncol(test)]), 
+                          type="response")
+    
+    # Predictions with a given threshold
+    Cred.pred = as.factor(ifelse(probability > threshold, 1, 0))
+    
+    beneficts = 0
+    
+    for (k in 1:length(Cred.pred)){
+      if(Cred.pred[k] == 1){
+        beneficts = beneficts + (test_original$X2015.PRICE.VAR....[k]*100)
+      }
+    }
+      
+    profit.i[i,j] <- beneficts
+    
+  }
+}
+
+```
 
 ```{r}
+boxplot(profit.i, main = "Hyper-parameter selection",
+        ylab = "unit profit",
+        xlab = "threshold",names = seq(0.1,0.9,0.1),col="royalblue2")
 
 ```
 
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
+Como vemos parece que no tendríamos ganacias prácticamente con ningún threshold, así que parece claro que con este modelo lo mejor sería que no invirtieramos nada. 
