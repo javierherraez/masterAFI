@@ -182,23 +182,6 @@ ajuste4 <- Arima(datos.train.ts,
 
 coeftest(ajuste4)
 
-# -----------------------ni falta haría
-
-cor.arma(ajuste4)
-
-Box.test.2(residuals(ajuste4),
-           nlag = c(6,12,18,24,30,36,42,48),
-           type="Ljung-Box")
-
-graphics.off()
-
-acf(ajuste4$residuals, lag.max = 48, xlab = "Retardo",
-    main= "Funci?n de autocorrelaci?n simple")
-
-pacf(ajuste4$residuals, lag.max = 48, xlab = "Retardo",
-     main = "Funci?n de autocorrelaci?n parcial")
-# -----------------------------------------------------
-
 
 # Se propone un SARIMA(1,0,1)x(0,1,1)12 + MU
 
@@ -209,17 +192,7 @@ ajuste5 <- Arima(datos.train.ts,
 
 coeftest(ajuste5)
 
-# Autom?ticamente ha quitado la constante
-
-ajuste5 <- Arima(datos.train.ts,
-                 include.constant = TRUE,
-                 order = c(1,0,1),
-                 seasonal = list(order = c(0,1,1), period = 12),
-                 method = "ML")
-
-coeftest(ajuste5)
-
-# Efectivamente, no era significativa. Est? bien quitada
+# Autom?ticamente ha quitado la constante, no era significativa. Est? bien quitada
 
 # Se propone un SARIMA(0,1,1)x(0,1,1)12 + MU este modelo se llama airlines model (0,1,1)x(0,1,1)12 /// el (0,1,1) se llama suavizado exponencial (o estacional, no me he enterado xd)
 
