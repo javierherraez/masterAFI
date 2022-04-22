@@ -1,0 +1,520 @@
+---
+title: "Ejercicio Final - Series Temporales"
+author: "Javier Herráez Albarrán"
+date: "22/4/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+## Carga de librerías y datos
+
+```{r}
+library(ggplot2)
+library(plotly)
+library(tseries)
+library(MASS)
+library(forecast)
+library(lmtest)
+library(caschrono)
+library(lubridate)
+library(timeDate)
+library(tsoutliers)
+library(dplyr)
+
+# Se limpia el espacio de trabajo:
+
+rm(list = ls())
+
+# Se asigna el directorio donde están los datos
+
+# setwd("C:/Users/Javier/Documents/masterAFI/16. Analisis de series temporales/01. Series temporales/practica/")
+setwd("C:/Users/jherraez/Documents/masterAFI/16. Analisis de series temporales/01. Series temporales/practica/")
+
+datos <- read.csv("_11_CACERES.csv")
+```
+
+Dividimos en train y en set y se convierten los datos en un objeto de tipo time series para poder aplicar sobre ellos las funciones de R.
+
+```{r}
+datos$FECHA = as.Date(datos$FECHA,format='%d/%m/%Y')
+datos.train <- subset(datos, FECHA<=as.Date('01/12/2018',format='%d/%m/%Y'))
+datos.test <- subset(datos, FECHA>as.Date('01/12/2018',format='%d/%m/%Y'))
+
+datos.train.ts <- as.ts(datos.train$TARGET, frequency = 12)
+datos.test.ts <- as.ts(datos.test$TARGET, frequency=12)
+
+```
+
+## Representación gráfica de los datos
+
+```{r}
+names(datos.train)
+
+graficoInicial <- ggplot(aes(x= FECHA, y = TARGET), data = datos.train) +
+  geom_line(color = '#d84519', size = 1) + 
+  xlab('FECHA') + ylab('Matriculaciones')
+
+ggplotly(graficoInicial)
+
+```
+
+## Estacionalidad
+### Estacionalidad en varianza
+
+Evaluamos si es necesario transformar la serie para hacerla estacionaria en varianza.
+
+```{r}
+box_cox <- boxcox(TARGET ~ FECHA,
+                  data = datos.train,
+                  lambda = c(0, 0.5, 1))
+
+lambda <- box_cox$x[which.max(box_cox$y)]
+lambda
+
+```
+
+Como lambda toma un valor cercano a cero, tomamos logaritmos.
+
+```{r}
+datos.train$log_target=log(datos.train$TARGET)
+datos.test$log_target=log(datos.test$TARGET)
+datos.train.ts <- as.ts(datos.train$log_target, frequency = 12)
+datos.test.ts <- as.ts(datos.test$log_target, frequency=12)
+```
+
+
+### Estacionalidad en media
+
+Probamos a hacer el test de Dickey-Fuller aunque no confiamos demasiado en su resultado, ya que es poco exigente.
+
+```{r}
+adf.test(datos.train.ts)
+```
+
+Todo parece indicar que va a ser necesaria una diferencia regular, pero nosotros ajustamos directamente sin nada.
+
+## Ajuste de un modelo SARIMA a la serie
+
+Observamos los gráficos f.a.s. y la f.a.p. para realizar el primer ajuste.
+
+```{r}
+acf(datos.train.ts, lag.max = 48, xlab = "Retardo",
+    main= "Función de autocorrelación simple")
+
+pacf(datos.train.ts, lag.max = 48, xlab = "Retardo",
+     main = "Función de autocorrelación parcial")
+```
+
+Lo habitual es empezar con una estructura AR(1). La fuerte correlación de orden 1 en la f.a.p parece reforzar esta decisión, por lo tanto, se propone un SARIMA(1,0,0)x(0,0,0)12 + MU
+
+```{r}
+ajuste1 <- Arima(datos.train.ts,
+                 order = c(1,0,0),
+                 seasonal = list(order = c(0,0,0), period = 12),
+                 method = "ML")
+ajuste1
+
+coeftest(ajuste1)
+```
+
+
+```{r}
+cor.arma(ajuste1) # debajo de 0.8 todo, no correlaciones
+
+```
+
+
+```{r}
+Box.test.2(residuals(ajuste1),
+           nlag = c(6,12,18,24,30,36,42,48),
+           type="Ljung-Box")                   # queremos valores >0.05 en todos
+```
+
+
+```{r}
+acf(ajuste1$residuals, lag.max = 48, xlab = "Retardo", # aquí vemos que sólo se salen en multiplos de 12 y que hay patrón de simetría # para la practica es medio verdad, decidimos hacer lo otro
+    main= "Función de autocorrelación simple")
+
+pacf(ajuste1$residuals, lag.max = 48, xlab = "Retardo",
+     main = "Función de autocorrelación parcial")
+# Se propone un SARIMA(1,0,1)x(0,0,0)12 + MU
+```
+
+
+```{r}
+ajuste2 <- Arima(datos.train.ts,
+                 order = c(1,0,1),
+                 seasonal = list(order = c(0,0,0), period = 12),
+                 method = "ML")
+
+coeftest(ajuste2)
+```
+
+
+```{r}
+cor.arma(ajuste2)
+```
+
+
+```{r}
+Box.test.2(residuals(ajuste2),
+           nlag = c(6,12,18,24,30,36,42,48),
+           type="Ljung-Box") # test de jung-box
+```
+
+
+```{r}
+acf(ajuste2$residuals, lag.max = 48, xlab = "Retardo",
+    main= "Función de autocorrelación simple")
+
+pacf(ajuste2$residuals, lag.max = 48, xlab = "Retardo",
+     main = "Función de autocorrelación parcial")
+
+# Se propone un SARIMA(1,0,1)x(1,0,0)12 + MU
+```
+
+
+```{r}
+ajuste3 <- Arima(datos.train.ts,
+                 order = c(1,0,1),
+                 seasonal = list(order = c(1,0,0), period = 12),
+                 method = "ML")
+
+coeftest(ajuste3)
+
+# Se propone un SARIMA(0,1,1)x(1,0,0)12 + MU
+```
+
+
+```{r}
+ajuste4 <- Arima(datos.train.ts,
+                 order = c(0,1,1),
+                 seasonal = list(order = c(1,0,0), period = 12),
+                 method = "ML")
+
+coeftest(ajuste4)
+```
+
+
+```{r}
+cor.arma(ajuste4)
+```
+
+
+```{r}
+Box.test.2(residuals(ajuste4),
+           nlag = c(6,12,18,24,30,36,42,48),
+           type="Ljung-Box") # test de jung-box
+```
+
+
+```{r}
+calculoExplicativasCalendarioCaceres <- function(variableFecha, domingoYFestivosJuntos){
+  
+  #######################################
+  #     Creación de todas las fechas    #
+  #######################################
+  
+  if (month(max(variableFecha)) %in% c(1,3,5,7,8,10,12)) {
+    diasHastaFinMes <- 30
+  } else if (month(max(variableFecha)) %in% c(4,6,9,11)) {
+    diasHastaFinMes <- 29
+  } else if (year(max(variableFecha))%%4==0) {
+    diasHastaFinMes <- 28
+  } else {diasHastaFinMes <- 27}
+  
+  todasLasFechas <- data.frame(fechas=seq(min(variableFecha),
+                                          max(variableFecha)+diasHastaFinMes,
+                                          by="days"))
+  
+  #######################################
+  #     Cálculo de la Semana Santa      #
+  #######################################
+  
+  domingoResurrecion <- as.Date(Easter(year(min(variableFecha)):year(max(variableFecha))))
+  lunesPascua <- domingoResurrecion + 1
+  sabadoSanto <- domingoResurrecion - 1
+  viernesSanto <- domingoResurrecion - 2
+  juevesSanto <- domingoResurrecion - 3
+  
+  # Se unen y ordenan todos los días que forman la Semana Santa
+  semanaSanta <- sort(c(juevesSanto, viernesSanto, sabadoSanto, domingoResurrecion, lunesPascua))
+  
+  # Se pone en formato data.frame y se añade un indicador
+  semanaSanta <- data.frame(fechas=semanaSanta, semanaSanta=rep(1,length(semanaSanta)))
+  
+  # Se añaden a la tabla maestra de fechas
+  todasLasFechas_2 <- merge(x = todasLasFechas, y = semanaSanta, by = "fechas", all.x = TRUE)
+  
+  # Se reemplazan los NAs por 0
+  todasLasFechas_2$semanaSanta[is.na(todasLasFechas_2$semanaSanta)] <- 0
+  
+  
+  ######################################
+  #     Cálculo de la variable dt      #
+  ######################################
+  
+  # 1. Definición de festivos:
+  ############################
+  
+  calendario <- todasLasFechas
+  
+  calendario$diaSemana <- as.factor(wday(calendario$fecha))
+  calendario$diaMes <- as.factor(day(calendario$fecha))
+  calendario$mes <- as.factor(month(calendario$fecha))
+  calendario$anyo <- as.factor(year(calendario$fecha))
+  
+  calendario$p_01ene <- ifelse(calendario$diaMes==1 & calendario$mes==1, 1, 0)
+  calendario$p_06ene <- ifelse(calendario$diaMes==6 & calendario$mes==1, 1, 0)
+  calendario$p_19mar <- ifelse(calendario$diaMes==19 & calendario$mes==3, 1, 0)
+  calendario$p_01may <- ifelse(calendario$diaMes==1 & calendario$mes==5, 1, 0)
+  calendario$p_15ago <- ifelse(calendario$diaMes==15 & calendario$mes==8, 1, 0)
+  calendario$p_12oct <- ifelse(calendario$diaMes==12 & calendario$mes==10,1, 0)
+  calendario$p_01nov <- ifelse(calendario$diaMes==1 & calendario$mes==11, 1 ,0)
+  calendario$p_06dic <- ifelse(calendario$diaMes==6 & calendario$mes==12, 1 ,0)
+  calendario$p_08dic <- ifelse(calendario$diaMes==8 & calendario$mes==12, 1 ,0)
+  calendario$p_25dic <- ifelse(calendario$diaMes==25 & calendario$mes==12, 1 ,0)
+  
+  # Fiestas regionales: día de Extremadura
+  calendario$p_08sep <- ifelse(calendario$diaMes==8 & calendario$mes==9, 1 ,0)
+  # Fiestas locales: San Jorge
+  calendario$p_23abr <- ifelse(calendario$diaMes==23 & calendario$mes==4, 1 ,0)
+  
+  calendario$festivo <- rowSums(subset(calendario, select=p_01ene:p_25dic))
+  
+  # La definición de la variable dt varía según la opción domingoYFestivosJuntos.
+  
+  if (domingoYFestivosJuntos==0){
+    
+    calendario$sabado <- ifelse(calendario$diaSemana==7, 1 ,0)
+    calendario$domingo <- ifelse(calendario$diaSemana==1, 1 ,0)
+    
+    # Días laborables: todos menos sábados y domingos
+    calendario$laborable <- 1-calendario$sabado-calendario$domingo
+    
+  } else {
+    
+    calendario$sabado <- ifelse(calendario$diaSemana==7, 1 ,0)
+    calendario$domingo <- ifelse(calendario$diaSemana==1, 1 ,0)
+    # Domingo=1 si domingo=1 o festivo=1
+    calendario$domingo <- ifelse(calendario$domingo==1 | calendario$festivo==1, 1 ,0)
+    
+    # Días laborables: todos menos sábados y domingos/festivos
+    calendario$laborable <- 1-calendario$sabado-calendario$domingo    
+  }
+  
+  
+  # 2. Definición de variable dt:
+  ###############################
+  
+  # Se filtran las columnas de inter?s y se añade la Semana Santa
+  
+  calendario_2 <- calendario[, c("fechas", "mes", "anyo", "sabado", "domingo", "laborable", "festivo")]
+  
+  todasLasFechasFinal <- merge(x = todasLasFechas_2, y = calendario_2,
+                               by = "fechas", all.x = TRUE)
+  
+  # Agregamos la serie a nivel a?o-mes
+  
+  calendarioAnyoMes <- aggregate(todasLasFechasFinal[,c("sabado","domingo",
+                                                        "laborable", "semanaSanta", "festivo")],
+                                 by=list(mes=todasLasFechasFinal$mes,
+                                         anyo=todasLasFechasFinal$anyo),
+                                 "sum")
+  
+  # Se calcula la variable dt:
+  
+  calendarioAnyoMes$dt <- calendarioAnyoMes$laborable-(5/2)*(calendarioAnyoMes$sabado+calendarioAnyoMes$domingo)
+  
+  
+  ######################################
+  #     Cálculo de años bisiestos      #
+  ######################################
+  
+  calendarioAnyoMes$anyoNum <- as.numeric(levels(calendarioAnyoMes$anyo))[calendarioAnyoMes$anyo]
+  
+  calendarioAnyoMes$bisiesto <- ifelse(calendarioAnyoMes$mes==2 &(calendarioAnyoMes$anyoNum %% 4)==0, 1 ,0)
+  
+  
+  #######################################################
+  #     Tabla final con explicativas de calendario      #
+  #######################################################
+  
+  if (domingoYFestivosJuntos==0){
+    explicativasCalendario <- cbind(fecha=variableFecha, calendarioAnyoMes[, c("semanaSanta", "dt", "bisiesto", "festivo")])
+  } else {
+    explicativasCalendario <- cbind(fecha=variableFecha, calendarioAnyoMes[, c("semanaSanta", "dt", "bisiesto")])
+  }
+  
+  return(explicativasCalendario)
+  
+}
+```
+
+
+```{r}
+explicativasCalendarioTrain <- calculoExplicativasCalendarioCaceres(datos.train$FECHA, domingoYFestivosJuntos=0)
+
+calendarioTrain <- 
+  as.matrix(
+    explicativasCalendarioTrain[,c("semanaSanta", "dt", "bisiesto", "festivo")]
+  )
+```
+
+
+```{r}
+ajuste4conCalendario <- Arima(datos.train.ts,
+                              order = c(0,1,1),
+                              seasonal = list(order = c(1,0,0), period = 12),
+                              xreg = calendarioTrain,
+                              method = "ML")
+
+coeftest(ajuste4conCalendario)
+
+# decidimos quitar año bisiesto
+```
+
+
+```{r}
+calendarioTrain <- 
+  as.matrix(
+    explicativasCalendarioTrain[,c("semanaSanta", "dt", "festivo")]
+  )
+
+# Se podría incluir tambi?n la variable festivo
+
+ajuste5conCalendario <- Arima(datos.train.ts,
+                              order = c(0,1,1),
+                              seasonal = list(order = c(1,0,0), period = 12),
+                              xreg = calendarioTrain,
+                              method = "ML")
+
+coeftest(ajuste5conCalendario)
+```
+
+
+```{r}
+cor.arma(ajuste5conCalendario)
+```
+
+
+```{r}
+Box.test.2(residuals(ajuste5conCalendario),
+           nlag = c(6,12,18,24,30,36,42,48),
+           type="Ljung-Box")
+
+```
+
+
+```{r}
+# [7]. Identificaci?n de outliers
+
+# Esto identifica outliers
+
+listaOutliersTrain <- locate.outliers(ajuste5conCalendario$residuals,
+                                      pars = coefs2poly(ajuste5conCalendario),
+                                      types = c("AO", "LS", "TC"),
+                                      cval=3)
+
+listaOutliersTrain$abststat=abs(listaOutliersTrain$tstat)
+
+# Cruzamos con la tabla original para obtener la fecha
+
+datos.train$ind <- as.numeric(rownames(datos.train))
+listaOutliersTrainFecha <- merge(listaOutliersTrain, datos.train[,c("ind", "FECHA")], by = "ind")
+
+arrange(listaOutliersTrainFecha,desc(listaOutliersTrainFecha$abststat))
+```
+
+
+```{r}
+outliersTrain <- outliers(c( "TC","LS","AO"), c(88, 99, 126))
+outliersVariablesTrain <- outliers.effects(outliersTrain, length(ajuste5conCalendario$residuals))
+calendarioMasOutliersTrain <- as.matrix(cbind(calendarioTrain, outliersVariablesTrain))
+```
+
+
+```{r}
+ajuste5conCalendarioYOutliers <- Arima(datos.train.ts,
+                                               order = c(0,1,1),
+                                               seasonal = list(order = c(1,0,0), period = 12),
+                                               xreg = calendarioMasOutliersTrain,
+                                               method = "ML")
+
+coeftest(ajuste5conCalendarioYOutliers)
+```
+
+
+```{r}
+cor.arma(ajuste5conCalendarioYOutliers)
+```
+
+
+```{r}
+Box.test.2(residuals(ajuste5conCalendarioYOutliers),
+           nlag = c(6,12,18,24,30,36,42,48),
+           type="Ljung-Box")
+
+```
+
+# [7]. Predicción
+
+```{r}
+explicativasCalendarioTest <- calculoExplicativasCalendarioCaceres(datos.test$FECHA,domingoYFestivosJuntos=0)
+calendarioTest <- as.matrix(explicativasCalendarioTest[,c("semanaSanta", "dt", "festivo")])
+```
+
+
+```{r}
+# Nos valen los ?ltimos 12 datos de la variable (12 1's)
+# para el valor futuro de la variable
+
+outliersVariablesTest <- outliersVariablesTrain[181:192,]
+calendarioMasOutliersTest <- as.matrix(cbind(calendarioTest, outliersVariablesTest))
+calendarioMasOutliersTest
+```
+
+
+```{r}
+prediccion <- as.data.frame(predict(ajuste5conCalendarioYOutliers, 
+                                    n.ahead=12,
+                                    newxreg=calendarioMasOutliersTest))
+
+#L?mites de confianza al 95%
+
+U <- exp(prediccion$pred + 2*prediccion$se)
+L <- exp(prediccion$pred - 2*prediccion$se)
+
+datos.pred <- data.frame(FECHA = datos.test$FECHA, 
+                         Prediccion = exp(prediccion$pred + 0.5 * prediccion$se^2),
+                         LimSup = U, 
+                         LimInf = L)
+```
+
+
+```{r}
+datos.real.pred <- merge(datos, datos.pred, by = "FECHA", all.x = T)
+
+datos.real.pred$REAL <- datos.real.pred$TARGET
+
+datos.real.pred$TARGET[datos.real.pred$FECHA>as.Date('01/12/2018',format='%d/%m/%Y')] <- NA
+
+grafico <- ggplot(data = datos.real.pred) +
+  geom_line(aes(x= FECHA, y = REAL), color = 'blue',
+            alpha = 0.4, size = 0.8) +
+  geom_line(aes(x= FECHA, y = TARGET), color = 'blue',
+            alpha = 0.8, size = 0.8) +
+  geom_line(aes(x= FECHA, y = Prediccion), color = 'darkred',
+            size = 1)   +
+  geom_line(aes(x= FECHA, y = LimSup), color = 'orange',
+            size = 1)  +
+  geom_line(aes(x= FECHA, y = LimInf), color = 'orange',
+            size = 1) +
+  xlab('FECHA') + ylab('Matriculaciones')
+
+ggplotly(grafico)
+```
+

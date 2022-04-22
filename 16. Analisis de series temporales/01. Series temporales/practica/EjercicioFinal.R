@@ -20,6 +20,7 @@ rm(list = ls())
 # Se asigna el directorio donde est?n los datos
 
 setwd("C:/Users/Javier/Documents/masterAFI/16. Analisis de series temporales/01. Series temporales/practica/")
+setwd("C:/Users/jherraez/Documents/masterAFI/16. Analisis de series temporales/01. Series temporales/practica/")
 
 # Carga de datos
 
@@ -399,7 +400,7 @@ calendarioTest <- as.matrix(explicativasCalendarioTest[,c("semanaSanta", "dt", "
 
 outliersVariablesTest <- outliersVariablesTrain[181:192,]
 
-calendarioMasOutliersTest <- as.matrix(cbind(calendarioTest, LS54=outliersVariablesTest))
+calendarioMasOutliersTest <- as.matrix(cbind(calendarioTest, outliersVariablesTest))
 
 prediccion <- as.data.frame(predict(ajuste5conCalendarioYOutliers, 
                                     n.ahead=12,
@@ -411,8 +412,9 @@ U <- exp(prediccion$pred + 2*prediccion$se)
 L <- exp(prediccion$pred - 2*prediccion$se)
 
 datos.pred <- data.frame(FECHA = datos.test$FECHA, 
-                         Prediccion = exp(prediccion$pred+0.5*prediccion$se^2),
-                         LimSup = U, LimInf =L)
+                         Prediccion = exp(prediccion$pred+0.5 * prediccion$se^2),
+                         LimSup = U, 
+                         LimInf = L)
 
 datos.real.pred <- merge(datos, datos.pred, by = "FECHA", all.x = T)
 
@@ -429,10 +431,14 @@ ggplotly(grafico1)
 
 # Gr?fico 2: Real + Predicci?n + l?mites
 
-datos.real.pred$target[datos.real.pred$FECHA>as.Date('01/12/2018',format='%d/%m/%Y')] <- NA
+datos.real.pred$TARGET2 <- datos.real.pred$TARGET
+
+datos.real.pred$TARGET[datos.real.pred$FECHA>as.Date('01/12/2018',format='%d/%m/%Y')] <- NA
 
 grafico2 <- ggplot(data = datos.real.pred) +
-  geom_line(aes(x= FECHA, y = TARGET), color = 'steelblue',
+  geom_line(aes(x= FECHA, y = TARGET2), color = 'blue',
+            alpha = 0.4, size = 0.8) +
+  geom_line(aes(x= FECHA, y = TARGET), color = 'blue',
             alpha = 0.8, size = 0.8) +
   geom_line(aes(x= FECHA, y = Prediccion), color = 'darkred',
             size = 1)   +
