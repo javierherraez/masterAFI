@@ -1,0 +1,4 @@
+*.gz
+pipeline
+*.parquet
+lastfm*
