@@ -1,6 +1,6 @@
 ---
 title: "Práctica - Análisis de Redes Sociales - MDSF"
-author: "TU NOMBRE"
+author: "Javier Herráez Albarrán"
 output:
   html_document:
     df_print: paged
@@ -24,7 +24,39 @@ En este apartado, se pide:
 * Simplificar: eliminar bucles y agregar enlaces múltiples, contando cuántas veces aparece un enlace y almacenándolo como un peso de la red resultante.
 
 ```{r}
-### Inserta aqui tu codigo
+library(igraph)
+
+rm(list = ls())
+
+setwd("C:/Users/Javier/Documents/masterAFI/18. Analisis de Grafos/01. Redes sociales/practica/")
+dd <- read.csv("red_contactos.csv", sep = ";")
+
+gg <- graph.data.frame(dd, directed = FALSE)
+```
+
+```{r}
+summary(gg)
+```
+
+```{r}
+vcount(gg)
+ecount(gg)
+```
+
+```{r}
+gg2 <- simplify(gg, remove.multiple = TRUE, remove.loops = TRUE)
+
+E(gg2)$weight = sapply(E(gg2), function(e) { 
+     length(all_shortest_paths(gg, from = ends(gg2, e)[1], to = ends(gg2, e)[2])$res) } )
+
+```
+
+```{r}
+summary(gg)
+```
+
+```{r}
+table(E(gg2)$weight)
 ```
 
 ## Selección de la componente conexa mayor (0,5 puntos)
@@ -32,7 +64,23 @@ En este apartado, se pide:
 En este apartado, se pide realizar los pasos adecuados para generar un nuevo objeto grafo, que sea conexo, y que involucre a todos los nodos y enlaces de la componente conexa mayor del grafo original.
 
 ```{r}
-### Inserta aqui tu codigo
+is.connected(gg2) # es conexo?
+```
+
+```{r}
+ccs <- components(gg2)
+ccs$csize
+```
+
+```{r}
+id_compmayor <- which.max(ccs$csize) # mayor componente conexa
+
+vids <- ccs$membership == id_compmayor
+vids <- which(ccs$membership == id_compmayor) #nodos de la comp conexa mayor
+
+gg3 <- induced_subgraph(gg2, vids = vids ) #subbgrafo solamente con estos nodos
+
+summary(gg3)
 ```
 
 
@@ -50,7 +98,65 @@ En este apartado, se pide analizar descriptivamente el grafo usando los concepto
 
 
 ```{r}
-### Inserta aqui tu codigo
+# grado medio
+mean(degree(gg3))
+```
+
+```{r}
+# distancia media
+average.path.length(gg3)
+```
+
+```{r}
+# diámetro
+diameter(gg3)
+```
+
+```{r}
+# Distribución de grados y ajuste a una Power-Law
+graph.density(gg3)
+```
+
+```{r}
+deg_dist <- degree_distribution(gg3)
+fit <- fit_power_law(deg_dist)
+fit
+```
+
+```{r}
+# plot the degree distribution on a log-log plot
+plot(deg_dist + 0.0001,
+     log = "xy",
+     xlab = "Node Degree",
+     ylab = "Probability")
+
+# add the fitted power law line; the exponent value comes from alpha, part of
+# the output of the fit.power.law() function. 
+lines(seq(deg_dist), 
+      seq(deg_dist)^-fit$alpha, 
+      col="red")
+```
+
+
+```{r}
+# Clustering
+mean(degree(gg3))
+```
+
+```{r}
+# Entropía de los nodos Shannon
+mean(diversity(gg3))
+```
+
+```{r}
+# Centralidad de los nodos y comparación con métricas de grado y clustering
+Degree <- degree(gg3)
+Eig <- evcent(gg3)$vector
+Closeness <- closeness(gg3)
+Betweenness <- betweenness(gg3)
+
+centralities <- cbind(Degree, Eig, Closeness, Betweenness)
+round(cor(centralities), 2)
 ```
 
 
@@ -59,7 +165,13 @@ En este apartado, se pide analizar descriptivamente el grafo usando los concepto
 En este apartado, se pide aplicar dos algoritmos de detección de comunidades, compararlos y seleccionar cuál es, en tu opinión, el que da una mejor respuesta. Razona tu selección.
 
 ```{r}
-### Inserta aqui tu codigo
+#### infomap, fastgreedy, label propagation, walktrap
+
+comms_infomap <- infomap.community(gg3)
+comms_walktrap <- walktrap.community(gg3)
+
+modularity(comms_infomap)
+modularity(comms_walktrap)
 ```
 
 
@@ -68,7 +180,14 @@ En este apartado, se pide aplicar dos algoritmos de detección de comunidades, co
 En este apartado, se pide visualizar el grafo coloreando cada nodo en función de la comunidad a la que pertenezca, según tu elección del apartado anterior.
 
 ```{r}
-### Inserta aqui tu codigo
+ll <- layout_with_lgl(gg3)
+palcol <- rainbow(n=max(comms_infomap$membership))
+
+plot(gg3, 
+     layout = ll, 
+     vertex.label='', 
+     vertex.size=log(degree(gg3)), 
+     vertex.color=palcol[comms_infomap$membership])
 ```
 
 
