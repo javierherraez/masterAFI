@@ -1,35 +1,36 @@
 ---
-title: "Pr·ctica - An·lisis de Redes Sociales - MDSF"
-author: "Javier Herr·ez Albarr·n"
+title: 'Pr√°ctica - An√°lisis de Redes Sociales - MDSF'
+author: 'Javier Herr√°ez Albarr√°n'
 output:
-  html_document:
-    df_print: paged
+html_document:
+df_print: paged
 ---
 
-Este R Markdown recoge el enunciado de la pr·ctica de la asignatura de redes sociales.
+Este R Markdown recoge el enunciado de la pr√°ctica de la asignatura de redes sociales.
 
-El objetivo es analizar un grafo, que se provee como fichero en el mismo paquete que este enunciado. En este fichero, encontramos solamente dos columnas, correspondiente a una interacciÛn entre dos nodos de la red. Esta red est· formada por distintos individuos que tienen contactos cara a cara durante un perÌodo de tiempo.
+El objetivo es analizar un grafo, que se provee como fichero en el mismo paquete que este enunciado. En este fichero, encontramos solamente dos columnas, correspondiente a una interacci√≥n entre dos nodos de la red. Esta red est√° formada por distintos individuos que tienen contactos cara a cara durante un per√≠odo de tiempo.
 
-A continuaciÛn, dividimos la pr·ctica en apartados, con una breve descripciÛn de quÈ debe contener cada chunk de cÛdigo donde el alumno desarrollar· su respuesta asÌ como las explicaciones que considere oportunas. Por favor, razona todas tus soluciones y escribe las explicaciones en azul.
+A continuaci√≥n, dividimos la pr√°ctica en apartados, con una breve descripci√≥n de qu√© debe contener cada chunk de c√≥digo donde el alumno desarrollar√° su respuesta as√≠ como las explicaciones que considere oportunas. Por favor, razona todas tus soluciones y escribe las explicaciones en azul.
 
-Junto al tÌtulo de cada apartado se encuentra la puntuaciÛn del mismo (pueden obtenerse hasta 10,5 puntos, aunque solamente se evaluar· del 0 al 10).
+Junto al t√≠tulo de cada apartado se encuentra la puntuaci√≥n del mismo (pueden obtenerse hasta 10,5 puntos, aunque solamente se evaluar√° del 0 al 10).
 
 ## Carga de datos y comprobaciones iniciales (0,5 puntos)
 
 En este apartado, se pide:
 
-* Cargar el fichero adjunto en la pr·ctica.
-* Convertirlo en un objeto grafo de IGraph. Se cargar· como un grafo NO dirigido.
-* Comprobar que, efectivamente, tiene el n˙mero de nodos y enlaces correcto.
-* Simplificar: eliminar bucles y agregar enlaces m˙ltiples, contando cu·ntas veces aparece un enlace y almacen·ndolo como un peso de la red resultante.
+* Cargar el fichero adjunto en la pr√°ctica.
+* Convertirlo en un objeto grafo de IGraph. Se cargar√° como un grafo NO dirigido.
+* Comprobar que, efectivamente, tiene el n√∫mero de nodos y enlaces correcto.
+* Simplificar: eliminar bucles y agregar enlaces m√∫ltiples, contando cu√°ntas veces aparece un enlace y almacen√°ndolo como un peso de la red resultante.
 
 ```{r}
 library(igraph)
 
 rm(list = ls())
 
-setwd("C:/Users/Javier/Documents/masterAFI/18. Analisis de Grafos/01. Redes sociales/practica/")
-dd <- read.csv("red_contactos.csv", sep = ";")
+# setwd('C:/Users/Javier/Documents/masterAFI/18. Analisis de Grafos/01. Redes sociales/practica/')
+setwd('C:/Users/jherraez/Documents/masterAFI/18. Analisis de Grafos/01. Redes sociales/practica/')
+dd <- read.csv('red_contactos.csv', sep = ';')
 
 gg <- graph.data.frame(dd, directed = FALSE)
 ```
@@ -46,8 +47,8 @@ ecount(gg)
 ```{r}
 gg2 <- simplify(gg, remove.multiple = TRUE, remove.loops = TRUE)
 
-E(gg2)$weight = sapply(E(gg2), function(e) { 
-     length(all_shortest_paths(gg, from = ends(gg2, e)[1], to = ends(gg2, e)[2])$res) } )
+E(gg2)$weight = sapply(E(gg2), function(e) {
+length(all_shortest_paths(gg, from = ends(gg2, e)[1], to = ends(gg2, e)[2])$res) } )
 
 ```
 
@@ -59,7 +60,7 @@ summary(gg)
 table(E(gg2)$weight)
 ```
 
-## SelecciÛn de la componente conexa mayor (0,5 puntos)
+## Selecci√≥n de la componente conexa mayor (0,5 puntos)
 
 En este apartado, se pide realizar los pasos adecuados para generar un nuevo objeto grafo, que sea conexo, y que involucre a todos los nodos y enlaces de la componente conexa mayor del grafo original.
 
@@ -84,22 +85,23 @@ summary(gg3)
 ```
 
 
-## An·lisis descriptivo de la componente conexa mayor (2,5 puntos)
+## An√°lisis descriptivo de la componente conexa mayor (2,5 puntos)
 
-En este apartado, se pide analizar descriptivamente el grafo usando los conceptos que hemos visto durante las clases de teorÌa:
+En este apartado, se pide analizar descriptivamente el grafo usando los conceptos que hemos visto durante las clases de teor√≠a:
 
 * Grado medio
 * Distancia media
-* Di·metro
-* DistribuciÛn de grados y ajuste a una Power-Law
+* Di√°metro
+* Distribuci√≥n de grados y ajuste a una Power-Law
 * Clustering
-* EntropÌa de los nodos
-* Centralidad de los nodos y comparaciÛn con mÈtricas de grado y clustering
+* Entrop√≠a de los nodos
+* Centralidad de los nodos y comparaci√≥n con m√©tricas de grado y clustering
 
 
 ```{r}
 # grado medio
 mean(degree(gg3))
+hist(degree(gg3), breaks = 20)
 ```
 
 ```{r}
@@ -108,12 +110,12 @@ average.path.length(gg3)
 ```
 
 ```{r}
-# di·metro
+# di√°metro
 diameter(gg3)
 ```
 
 ```{r}
-# DistribuciÛn de grados y ajuste a una Power-Law
+# Distribuci√≥n de grados y ajuste a una Power-Law
 graph.density(gg3)
 ```
 
@@ -126,30 +128,31 @@ fit
 ```{r}
 # plot the degree distribution on a log-log plot
 plot(deg_dist + 0.0001,
-     log = "xy",
-     xlab = "Node Degree",
-     ylab = "Probability")
+log = 'xy',
+xlab = 'Node Degree',
+ylab = 'Probability')
 
 # add the fitted power law line; the exponent value comes from alpha, part of
-# the output of the fit.power.law() function. 
-lines(seq(deg_dist), 
-      seq(deg_dist)^-fit$alpha, 
-      col="red")
+# the output of the fit.power.law() function.
+lines(seq(deg_dist),
+seq(deg_dist)^-fit$alpha,
+col='red')
 ```
 
 
 ```{r}
 # Clustering
-mean(degree(gg3))
+mean(count_triangles(gg3))
+hist(count_triangles(gg3), breaks = 20)
 ```
 
 ```{r}
-# EntropÌa de los nodos Shannon
-mean(diversity(gg3))
+# Entrop√≠a de los nodos Shannon
+hist(diversity(gg3), breaks = 20)
 ```
 
 ```{r}
-# Centralidad de los nodos y comparaciÛn con mÈtricas de grado y clustering
+# Centralidad de los nodos y comparaci√≥n con m√©tricas de grado y clustering
 Degree <- degree(gg3)
 Eig <- evcent(gg3)$vector
 Closeness <- closeness(gg3)
@@ -160,9 +163,9 @@ round(cor(centralities), 2)
 ```
 
 
-## An·lisis de comunidades de la componente conexa mayor (1,5 puntos)
+## An√°lisis de comunidades de la componente conexa mayor (1,5 puntos)
 
-En este apartado, se pide aplicar dos algoritmos de detecciÛn de comunidades, compararlos y seleccionar cu·l es, en tu opiniÛn, el que da una mejor respuesta. Razona tu selecciÛn.
+En este apartado, se pide aplicar dos algoritmos de detecci√≥n de comunidades, compararlos y seleccionar cu√°l es, en tu opini√≥n, el que da una mejor respuesta. Razona tu selecci√≥n.
 
 ```{r}
 #### infomap, fastgreedy, label propagation, walktrap
@@ -172,45 +175,148 @@ comms_walktrap <- walktrap.community(gg3)
 
 modularity(comms_infomap)
 modularity(comms_walktrap)
+
+compare(comms_infomap, comms_walktrap, method='nmi')
+
+table(comms_infomap$membership)
+table(comms_walktrap$membership)
 ```
 
 
-## VisualizaciÛn del grafo por comunidades de la componente conexa mayor (1,5 puntos)
+## Visualizaci√≥n del grafo por comunidades de la componente conexa mayor (1,5 puntos)
 
-En este apartado, se pide visualizar el grafo coloreando cada nodo en funciÛn de la comunidad a la que pertenezca, seg˙n tu elecciÛn del apartado anterior.
+En este apartado, se pide visualizar el grafo coloreando cada nodo en funci√≥n de la comunidad a la que pertenezca, seg√∫n tu elecci√≥n del apartado anterior.
 
-```{r}
-ll <- layout_with_lgl(gg3)
+```{r, fig.width=30, fig.height=30}
+wws <- ifelse(crossing(comms_infomap, gg3), 1, 500)
+ll <- layout_with_fr(gg3, weights=wws)
+
 palcol <- rainbow(n=max(comms_infomap$membership))
 
-plot(gg3, 
-     layout = ll, 
-     vertex.label='', 
-     vertex.size=log(degree(gg3)), 
-     vertex.color=palcol[comms_infomap$membership])
+plot(gg3,
+layout = ll,
+vertex.label='',
+vertex.size=log(degree(gg3)),
+vertex.color=palcol[comms_infomap$membership])
 ```
 
 
 ## Difundiendo un rumor (o un virus) en la componente conexa mayor (4 puntos)
 
-Este apartado es el que m·s peso en la pr·ctica tiene. Vamos a implementar un modelo epidemiolÛgico sobre el grafo que, tÌpicamente, se utiliza para simular escenarios de difusiÛn de enfermedades pero tambiÈn en contextos como la distribuciÛn de rumoeres e informaciÛn. Vamos a implementar un modelo SIR que se caracteriza por tener los siguientes par·metros:
+Este apartado es el que m√°s peso en la pr√°ctica tiene. Vamos a implementar un modelo epidemiol√≥gico sobre el grafo que, t√≠picamente, se utiliza para simular escenarios de difusi√≥n de enfermedades pero tambi√©n en contextos como la distribuci√≥n de rumoeres e informaci√≥n. Vamos a implementar un modelo SIR que se caracteriza por tener los siguientes par√°metros:
 
-* N˙mero de nodos iniciales infectados en el momento t=0 (N).
+* N√∫mero de nodos iniciales infectados en el momento t=0 (N).
 * Beta: probabilidad de contagio de un nodo infectado (I) a un nodo susceptible de serlo (S)
 * Gamma: probabilidad de que un nodo infectado (I) se recupere en momenteo actual (R). Los nodos en estado (R) no son susceptibles y permanecen en este estado infinitamente.
 
-Se pide desarrollar una funciÛn que tenga como par·metros los tres valores anteriores y un cuarto que sea un grafo que, en nuestro caso, ser· la componente conexa mayor del grafo original de esta pr·ctica. Dicha funciÛn simular· el proceso SIR:
+Se pide desarrollar una funci√≥n que tenga como par√°metros los tres valores anteriores y un cuarto que sea un grafo que, en nuestro caso, ser√° la componente conexa mayor del grafo original de esta pr√°ctica. Dicha funci√≥n simular√° el proceso SIR:
 
-* En t=0, se seleccionan N nodos al azar, que pasar·n a estado infectado.
-* En t=1, se podr·n contagiar con probabilidad Beta nodos que tienen un vecino infectado; OJO: si un nodo en estado S tiene varios vecinos en estado I tiene m·s probabilidad de infectarse ya que cada vecino tendr· un intento de infectarle.
+* En t=0, se seleccionan N nodos al azar, que pasar√°n a estado infectado.
+* En t=1, se podr√°n contagiar con probabilidad Beta nodos que tienen un vecino infectado; OJO: si un nodo en estado S tiene varios vecinos en estado I tiene m√°s probabilidad de infectarse ya que cada vecino tendr√° un intento de infectarle.
 * Se repite el paso anterior sucesivamente, hasta que no vemos infectados nuevos durante, al menos, 3 iteraciones.
 
-Se pide ejecutar una simulaciÛn para tres o cuatro valores del par·metro beta (N y gamma pueden ser fijos en estas simulaciones) de este proceso de manera que se pueda visualizar:
+Se pide ejecutar una simulaci√≥n para tres o cuatro valores del par√°metro beta (N y gamma pueden ser fijos en estas simulaciones) de este proceso de manera que se pueda visualizar:
 
-* La curva de nuevos infectados en escala logarÌtmica para cada caso.
-* El grafo que surge de la cascada de contagios: es decir, dos nodos est·n enlazados ahora si uno ha contagiado al otro. Como es lÛgico, tanto los nodos como los enlaces de este nuevo grafo son un subconjunto del grafo original.
- 
+* La curva de nuevos infectados en escala logar√≠tmica para cada caso.
+* El grafo que surge de la cascada de contagios: es decir, dos nodos est√°n enlazados ahora si uno ha contagiado al otro. Como es l√≥gico, tanto los nodos como los enlaces de este nuevo grafo son un subconjunto del grafo original.
+
 ```{r}
-### Inserta aqui tu codigo
+generate_sir <- function(N = 5, beta = 0.1, gamma = 0.1, graph){
+  graph <- set_vertex_attr(graph, 'label', value = 'S')
+  
+  sample_index <- sample(1:vcount(graph), N)
+  graph <- set_vertex_attr(graph, 'label', index = sample_index, value = 'I')
+  
+  n_contagiados = N
+  n_susceptibles = vcount(graph) - N
+  n_recuperados = 0
+  dias_sin_contagios = 0
+  
+  lista_contagiados = c(n_contagiados)
+  lista_susceptibles = c(n_susceptibles)
+  lista_recuperados = c(n_recuperados)
+  dia = 1
+  
+  while (dias_sin_contagios < 3){
+    n_contagiados_iniciales = n_contagiados
+    n_contagiados_aux = n_contagiados
+    
+    for (v in V(graph)){
+      state <- V(graph)[v]$label
+      
+      if (state == 'I'){
+        if (rbinom(n=1, size=1, prob = gamma) == 1){
+          V(graph)[v]$label <- 'R'
+          n_recuperados = n_recuperados + 1
+          n_contagiados = n_contagiados - 1
+        }
+      }
+      if (state == 'S'){
+        for (neighbor in neighbors(graph, v)){
+          if (V(graph)[neighbor]$label == 'I'){
+            if (rbinom(n=1, size=1, prob = beta) == 1){
+              V(graph)[v]$label <- 'I'
+              n_contagiados = n_contagiados + 1
+              n_contagiados_aux = n_contagiados_aux + 1
+              n_susceptibles = n_susceptibles - 1
+              break
+            }
+          }
+        }
+      }
+    }
+    if (n_contagiados_iniciales == n_contagiados_aux){
+      dias_sin_contagios = dias_sin_contagios + 1
+    } else {
+      dias_sin_contagios = 0
+    }
+    lista_contagiados = c(lista_contagiados, n_contagiados)
+    lista_susceptibles = c(lista_susceptibles, n_susceptibles)
+    lista_recuperados = c(lista_recuperados, n_recuperados)
+    dia = dia + 1
+  }
+  
+  return (list('final_state' = V(graph)$label,
+               'contagiados' = lista_contagiados,
+               'susceptibles' = lista_susceptibles,
+               'recuperados' = lista_recuperados,
+               'dias' = dia
+          ))
+
+}
+
+plot_evolution <- function(evolution){
+  plot(1:evolution$dias, evolution$contagiados, type = 'l', col = 'red',
+       ylab = 'N¬∫ Personas', xlab = 'D√≠as', ylim = c(0, max(evolution$susceptibles)))
+  lines(1:evolution$dias, evolution$recuperados, type = 'l', col="green")
+  lines(1:evolution$dias, evolution$susceptibles, type = 'l', col="blue")
+  
+  legend(evolution$dias, max(evolution$susceptibles)/2, 
+         legend=c('Contagiados', 'Recuperados', 'Susceptibles'),
+         col=c("red", 'green', "blue"), lty=1, cex=0.8, xjust = 1)
+}
 ```
 
+```{r}
+ejemplo_SIR_1 <- generate_sir(graph = gg3, beta = 0.2)
+
+plot_evolution(ejemplo_SIR_1)
+```
+
+```{r}
+ejemplo_SIR_2 <- generate_sir(graph = gg3, beta = 0.1)
+
+plot_evolution(ejemplo_SIR_2)
+```
+
+```{r}
+ejemplo_SIR_3 <- generate_sir(graph = gg3, beta = 0.05)
+
+plot_evolution(ejemplo_SIR_3)
+```
+
+```{r}
+ejemplo_SIR_4 <- generate_sir(graph = gg3, beta = 0.01)
+
+plot_evolution(ejemplo_SIR_4)
+```
