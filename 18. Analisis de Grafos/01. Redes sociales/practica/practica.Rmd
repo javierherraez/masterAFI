@@ -215,10 +215,10 @@ Se pide ejecutar una simulación para tres o cuatro valores del parámetro beta 
 ```{r}
 generate_sir <- function(N = 5, beta = 0.1, gamma = 0.1, graph){
   graph <- set_vertex_attr(graph, 'label', value = 'S')
+  graph <- set_edge_attr(graph, 'label', value = '')
   
   sample_index <- sample(1:vcount(graph), N)
   graph <- set_vertex_attr(graph, 'label', index = sample_index, value = 'I')
-  graph <- set_edge_attr(graph, 'label', value = '')
   
   n_contagiados = N
   n_susceptibles = vcount(graph) - N
@@ -233,8 +233,6 @@ generate_sir <- function(N = 5, beta = 0.1, gamma = 0.1, graph){
   lista_grafo = list(graph)
   
   while (dias_sin_contagios < 3){
-    n_contagiados_iniciales = n_contagiados
-    n_contagiados_aux = n_contagiados
     n_nuevos_contagios = 0
     
     for (v in V(graph)){
@@ -253,14 +251,14 @@ generate_sir <- function(N = 5, beta = 0.1, gamma = 0.1, graph){
             V(graph)[v]$label <- 'I'
             E(graph)[v %--% neighbor]$label <- 'I'
             n_contagiados = n_contagiados + 1
-            n_contagiados_aux = n_contagiados_aux + 1
+            n_nuevos_contagios = n_nuevos_contagios + 1
             n_susceptibles = n_susceptibles - 1
             break
           }
         }
       }
     }
-    if (n_contagiados_iniciales == n_contagiados_aux){
+    if (n_nuevos_contagios == 0){
       dias_sin_contagios = dias_sin_contagios + 1
     } else {
       dias_sin_contagios = 0
@@ -269,7 +267,7 @@ generate_sir <- function(N = 5, beta = 0.1, gamma = 0.1, graph){
     lista_contagiados = c(lista_contagiados, n_contagiados)
     lista_susceptibles = c(lista_susceptibles, n_susceptibles)
     lista_recuperados = c(lista_recuperados, n_recuperados)
-    lista_nuevos_contagios = c(lista_nuevos_contagios, n_contagiados_aux - n_contagiados_iniciales)
+    lista_nuevos_contagios = c(lista_nuevos_contagios, n_nuevos_contagios)
     lista_grafo[[dia]] = graph
   }
   
@@ -285,14 +283,25 @@ generate_sir <- function(N = 5, beta = 0.1, gamma = 0.1, graph){
 }
 
 plot_evolution <- function(evolution){
-  plot(1:evolution$dias, evolution$contagiados, type = 'l', col = 'red',
-       ylab = 'Nº Personas', xlab = 'Días', ylim = c(0, max(evolution$susceptibles)))
-  lines(1:evolution$dias, evolution$recuperados, type = 'l', col="green")
-  lines(1:evolution$dias, evolution$susceptibles, type = 'l', col="blue")
+  plot(1:evolution$dias, evolution$contagiados, 
+       type = 'l', col = 'red',
+       ylab = 'Nº Personas', xlab = 'Días', 
+       ylim = c(0, max(evolution$susceptibles)))
+  lines(1:evolution$dias, evolution$recuperados, 
+        type = 'l', col="green")
+  lines(1:evolution$dias, evolution$susceptibles, 
+        type = 'l', col="blue")
   
   legend(evolution$dias, max(evolution$susceptibles)/2, 
          legend=c('Contagiados', 'Recuperados', 'Susceptibles'),
-         col=c("red", 'green', "blue"), lty=1, cex=0.8, xjust = 1)
+         col=c("red", 'green', "blue"), 
+         lty=1, cex=0.8, xjust = 1)
+}
+
+plot_new_infections <- function(list_new_infections, dias){
+  plot(1:dias, list_new_infections, 
+       type = 'o', col = 'red', log = 'y', 
+       ylab = 'Nº Personas', xlab = 'Días')
 }
 
 plot_infection_graph <- function(graph, index){
@@ -320,11 +329,6 @@ create_gif <- function(list_graphs){
   dev.off()
   animation <- magick::image_animate(img, fps = 2, optimize = TRUE)
   print(animation)
-}
-
-plot_new_infections <- function(list_new_infections, dias){
-  plot(1:dias, list_new_infections, type = 'o', col = 'red', log = 'y', 
-       ylab = 'Nº Personas', xlab = 'Días')
 }
 ```
 
