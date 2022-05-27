@@ -28,8 +28,8 @@ library(igraph)
 
 rm(list = ls())
 
-# setwd('C:/Users/Javier/Documents/masterAFI/18. Analisis de Grafos/01. Redes sociales/practica/')
-setwd('C:/Users/jherraez/Documents/masterAFI/18. Analisis de Grafos/01. Redes sociales/practica/')
+setwd('C:/Users/Javier/Documents/masterAFI/18. Analisis de Grafos/01. Redes sociales/practica/')
+# setwd('C:/Users/jherraez/Documents/masterAFI/18. Analisis de Grafos/01. Redes sociales/practica/')
 dd <- read.csv('red_contactos.csv', sep = ';')
 
 gg <- graph.data.frame(dd, directed = FALSE)
@@ -48,7 +48,7 @@ ecount(gg)
 gg2 <- simplify(gg, remove.multiple = TRUE, remove.loops = TRUE)
 
 E(gg2)$weight = sapply(E(gg2), function(e) {
-length(all_shortest_paths(gg, from = ends(gg2, e)[1], to = ends(gg2, e)[2])$res) } )
+  length(all_shortest_paths(gg, from = ends(gg2, e)[1], to = ends(gg2, e)[2])$res) } )
 
 ```
 
@@ -126,17 +126,9 @@ fit
 ```
 
 ```{r}
-# plot the degree distribution on a log-log plot
-plot(deg_dist + 0.0001,
-log = 'xy',
-xlab = 'Node Degree',
-ylab = 'Probability')
+plot(deg_dist + 0.0001, log = 'xy', xlab = 'Node Degree', ylab = 'Probability')
 
-# add the fitted power law line; the exponent value comes from alpha, part of
-# the output of the fit.power.law() function.
-lines(seq(deg_dist),
-seq(deg_dist)^-fit$alpha,
-col='red')
+lines(seq(deg_dist), seq(deg_dist)^-fit$alpha, col='red')
 ```
 
 
@@ -194,10 +186,10 @@ ll <- layout_with_fr(gg3, weights=wws)
 palcol <- rainbow(n=max(comms_infomap$membership))
 
 plot(gg3,
-layout = ll,
-vertex.label='',
-vertex.size=log(degree(gg3)),
-vertex.color=palcol[comms_infomap$membership])
+     layout = ll,
+     vertex.label='',
+     vertex.size=log(degree(gg3)),
+     vertex.color=palcol[comms_infomap$membership])
 ```
 
 
@@ -226,20 +218,24 @@ generate_sir <- function(N = 5, beta = 0.1, gamma = 0.1, graph){
   
   sample_index <- sample(1:vcount(graph), N)
   graph <- set_vertex_attr(graph, 'label', index = sample_index, value = 'I')
+  graph <- set_edge_attr(graph, 'label', value = '')
   
   n_contagiados = N
   n_susceptibles = vcount(graph) - N
   n_recuperados = 0
   dias_sin_contagios = 0
+  dia = 1
   
   lista_contagiados = c(n_contagiados)
   lista_susceptibles = c(n_susceptibles)
   lista_recuperados = c(n_recuperados)
-  dia = 1
+  lista_nuevos_contagios = c(n_contagiados)
+  lista_grafo = list(graph)
   
   while (dias_sin_contagios < 3){
     n_contagiados_iniciales = n_contagiados
     n_contagiados_aux = n_contagiados
+    n_nuevos_contagios = 0
     
     for (v in V(graph)){
       state <- V(graph)[v]$label
@@ -253,14 +249,13 @@ generate_sir <- function(N = 5, beta = 0.1, gamma = 0.1, graph){
       }
       if (state == 'S'){
         for (neighbor in neighbors(graph, v)){
-          if (V(graph)[neighbor]$label == 'I'){
-            if (rbinom(n=1, size=1, prob = beta) == 1){
-              V(graph)[v]$label <- 'I'
-              n_contagiados = n_contagiados + 1
-              n_contagiados_aux = n_contagiados_aux + 1
-              n_susceptibles = n_susceptibles - 1
-              break
-            }
+          if ((V(graph)[neighbor]$label == 'I') && (rbinom(n=1, size=1, prob = beta) == 1)){
+            V(graph)[v]$label <- 'I'
+            E(graph)[v %--% neighbor]$label <- 'I'
+            n_contagiados = n_contagiados + 1
+            n_contagiados_aux = n_contagiados_aux + 1
+            n_susceptibles = n_susceptibles - 1
+            break
           }
         }
       }
@@ -270,17 +265,21 @@ generate_sir <- function(N = 5, beta = 0.1, gamma = 0.1, graph){
     } else {
       dias_sin_contagios = 0
     }
+    dia = dia + 1
     lista_contagiados = c(lista_contagiados, n_contagiados)
     lista_susceptibles = c(lista_susceptibles, n_susceptibles)
     lista_recuperados = c(lista_recuperados, n_recuperados)
-    dia = dia + 1
+    lista_nuevos_contagios = c(lista_nuevos_contagios, n_contagiados_aux - n_contagiados_iniciales)
+    lista_grafo[[dia]] = graph
   }
   
   return (list('final_state' = V(graph)$label,
                'contagiados' = lista_contagiados,
                'susceptibles' = lista_susceptibles,
                'recuperados' = lista_recuperados,
-               'dias' = dia
+               'nuevos_contagios' = lista_nuevos_contagios,
+               'dias' = dia,
+               'grafos' = lista_grafo
           ))
 
 }
@@ -295,28 +294,81 @@ plot_evolution <- function(evolution){
          legend=c('Contagiados', 'Recuperados', 'Susceptibles'),
          col=c("red", 'green', "blue"), lty=1, cex=0.8, xjust = 1)
 }
+
+plot_infection_graph <- function(graph, index){
+  
+  graph_colors <- ifelse(V(graph)$label == 'I', 'red',
+                       ifelse(V(graph)$label == 'R', 'green', 'blue'))
+
+  subg <- subgraph.edges(graph, E(graph)[label == 'I'])
+  
+  plot(subg,
+       layout = ll,
+       vertex.label = '',
+       vertex.size = log(degree(graph)),
+       edge.label = '',
+       vertex.color = graph_colors,
+       main = paste('Dia', index))
+  
+}
+
+create_gif <- function(list_graphs){
+  img <- magick::image_graph(width = 1000, height = 1000)
+  for (i in 1:length(list_graphs)){
+    plot_infection_graph(list_graphs[[i]], i)
+  }
+  dev.off()
+  animation <- magick::image_animate(img, fps = 2, optimize = TRUE)
+  print(animation)
+}
+
+plot_new_infections <- function(list_new_infections, dias){
+  plot(1:dias, list_new_infections, type = 'o', col = 'red', log = 'y', 
+       ylab = 'Nº Personas', xlab = 'Días')
+}
 ```
 
 ```{r}
-ejemplo_SIR_1 <- generate_sir(graph = gg3, beta = 0.2)
+ejemplo_SIR_1 <- generate_sir(graph = gg3, beta = 0.1)
 
 plot_evolution(ejemplo_SIR_1)
 ```
 
 ```{r}
-ejemplo_SIR_2 <- generate_sir(graph = gg3, beta = 0.1)
+plot_new_infections(ejemplo_SIR_1$nuevos_contagios, ejemplo_SIR_1$dias)
+```
+
+
+```{r, fig.width=30, fig.height=30}
+create_gif(ejemplo_SIR_1$grafos)
+```
+
+```{r}
+ejemplo_SIR_2 <- generate_sir(graph = gg3, beta = 0.05)
 
 plot_evolution(ejemplo_SIR_2)
 ```
 
 ```{r}
-ejemplo_SIR_3 <- generate_sir(graph = gg3, beta = 0.05)
+plot_new_infections(ejemplo_SIR_2$nuevos_contagios, ejemplo_SIR_2$dias)
+```
+
+```{r, fig.width=30, fig.height=30}
+create_gif(ejemplo_SIR_2$grafos)
+```
+
+```{r}
+ejemplo_SIR_3 <- generate_sir(graph = gg3, beta = 0.01)
 
 plot_evolution(ejemplo_SIR_3)
 ```
 
-```{r}
-ejemplo_SIR_4 <- generate_sir(graph = gg3, beta = 0.01)
 
-plot_evolution(ejemplo_SIR_4)
+```{r}
+plot_new_infections(ejemplo_SIR_3$nuevos_contagios, ejemplo_SIR_3$dias)
+```
+
+
+```{r, fig.width=30, fig.height=30}
+create_gif(ejemplo_SIR_3$grafos)
 ```
