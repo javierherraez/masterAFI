@@ -23,63 +23,80 @@ En este apartado, se pide:
 * Comprobar que, efectivamente, tiene el número de nodos y enlaces correcto.
 * Simplificar: eliminar bucles y agregar enlaces múltiples, contando cuántas veces aparece un enlace y almacenándolo como un peso de la red resultante.
 
+```{r global_options, include=T, echo = F}
+knitr::opts_chunk$set(echo = T, warning=FALSE, message=FALSE)
+```
+
+### Cargar el fichero adjunto en la práctica.
+
 ```{r}
 library(igraph)
 
 rm(list = ls())
 
 setwd('C:/Users/Javier/Documents/masterAFI/18. Analisis de Grafos/01. Redes sociales/practica/')
-# setwd('C:/Users/jherraez/Documents/masterAFI/18. Analisis de Grafos/01. Redes sociales/practica/')
 dd <- read.csv('red_contactos.csv', sep = ';')
-
-gg <- graph.data.frame(dd, directed = FALSE)
 ```
+
+### Convertirlo en un objeto grafo de IGraph.
 
 ```{r}
+gg <- graph.data.frame(dd, directed = FALSE)
 summary(gg)
 ```
+
+### Comprobar que, efectivamente, tiene el número de nodos y enlaces correcto.
 
 ```{r}
 vcount(gg)
 ecount(gg)
 ```
 
+### Simplificar: eliminar bucles y agregar enlaces múltiples
+
 ```{r}
 gg2 <- simplify(gg, remove.multiple = TRUE, remove.loops = TRUE)
+
+# para cada enlace, calculamos cuantos caminos cortos hay entre sus vértices 
+# el camino mínimo será igual al enlace, por lo tanto, la cantidad será igual al número de enlaces múltiples
+# esta cantidad, lo añadimos como peso
 
 E(gg2)$weight = sapply(E(gg2), function(e) {
   length(all_shortest_paths(gg, from = ends(gg2, e)[1], to = ends(gg2, e)[2])$res) } )
 
+
+summary(gg2)
 ```
 
 ```{r}
-summary(gg)
-```
-
-```{r}
-table(E(gg2)$weight)
+hist(E(gg2)$weight, breaks = 30)
 ```
 
 ## Selección de la componente conexa mayor (0,5 puntos)
 
 En este apartado, se pide realizar los pasos adecuados para generar un nuevo objeto grafo, que sea conexo, y que involucre a todos los nodos y enlaces de la componente conexa mayor del grafo original.
 
+Comprobamos que no sea conexo:
+
 ```{r}
-is.connected(gg2) # es conexo?
+is.connected(gg2)
 ```
+
+Visualizamos los tamaños de las distintas componentes conexas:
 
 ```{r}
 ccs <- components(gg2)
 ccs$csize
 ```
+Vemos que hay 3 componentes conexas, una de ellas acumula prácticamente todos los puntos. Nos quedamos con ella:
 
 ```{r}
-id_compmayor <- which.max(ccs$csize) # mayor componente conexa
+id_compmayor <- which.max(ccs$csize)
 
 vids <- ccs$membership == id_compmayor
-vids <- which(ccs$membership == id_compmayor) #nodos de la comp conexa mayor
+vids <- which(ccs$membership == id_compmayor)
 
-gg3 <- induced_subgraph(gg2, vids = vids ) #subbgrafo solamente con estos nodos
+gg3 <- induced_subgraph(gg2, vids = vids )
 
 summary(gg3)
 ```
@@ -97,27 +114,33 @@ En este apartado, se pide analizar descriptivamente el grafo usando los concepto
 * Entropía de los nodos
 * Centralidad de los nodos y comparación con métricas de grado y clustering
 
+### Grado medio
 
 ```{r}
-# grado medio
 mean(degree(gg3))
 hist(degree(gg3), breaks = 20)
 ```
 
+### Distancia media
+
 ```{r}
-# distancia media
 average.path.length(gg3)
 ```
 
+### Diámetro
+
 ```{r}
-# diámetro
 diameter(gg3)
 ```
 
+### Distribución de grados y ajuste a una Power-Law
+
+Podemos empezar por ver la densidad:
+
 ```{r}
-# Distribución de grados y ajuste a una Power-Law
 graph.density(gg3)
 ```
+A continuación, ajustamos una Power Law:
 
 ```{r}
 deg_dist <- degree_distribution(gg3)
@@ -127,41 +150,69 @@ fit
 
 ```{r}
 plot(deg_dist + 0.0001, log = 'xy', xlab = 'Node Degree', ylab = 'Probability')
-
 lines(seq(deg_dist), seq(deg_dist)^-fit$alpha, col='red')
 ```
 
+Tanto con el p-value como con el plot, podemos ver que nuestros datos no se ajustan a una Power Law.
+
+Podemos tratar de ver que pasaría si eliminamos aquellos nodos con los que obteníamos un valor 0 en la función de distribución:
 
 ```{r}
-# Clustering
-mean(count_triangles(gg3))
-hist(count_triangles(gg3), breaks = 20)
+gg_prueba <- induced_subgraph(gg3, vids = V(gg3)[deg_dist > 0])
+deg_dist_prueba <- degree_distribution(gg_prueba)
+fit_prueba <- fit_power_law(deg_dist_prueba)
+fit_prueba
+
+plot(deg_dist_prueba  + 0.0001, log = 'xy', xlab = 'Node Degree', ylab = 'Probability')
+lines(seq(deg_dist_prueba), seq(deg_dist_prueba)^-fit_prueba$alpha, col='red')
 ```
 
-```{r}
-# Entropía de los nodos Shannon
-hist(diversity(gg3), breaks = 20)
-```
+Con el nuevo grafo que hemos creado parece que sí que tendríamos unos datos que se pueden ajustar a una Power Lab.
+
+### Clustering
+
+Podemos observar el número de triángulos por nodo:
 
 ```{r}
-# Centralidad de los nodos y comparación con métricas de grado y clustering
+triangulos <- count_triangles(gg3)
+mean(triangulos)
+hist(triangulos, breaks = 30)
+```
+
+### Entropía de Shannon de los nodos 
+
+```{r}
+hist(diversity(gg3), breaks = 20, main = '', xlab = 'Diversity')
+```
+
+### Centralidad de los nodos y comparación con métricas de grado y clustering
+
+Vemos las distintas centralidades, hacemos histogramas de ellas y observamos como se correlacionan:
+
+```{r}
 Degree <- degree(gg3)
 Eig <- evcent(gg3)$vector
 Closeness <- closeness(gg3)
 Betweenness <- betweenness(gg3)
 
-centralities <- cbind(Degree, Eig, Closeness, Betweenness)
+par(mfrow=c(2,2))
+for (centrality in c('Degree', 'Eig', 'Closeness', 'Betweenness')){
+  hist(get(centrality), breaks = 30, xlab = centrality, main = '')
+}
+
+centralities <- cbind(Degree, Eig, Closeness, Betweenness, triangulos)
 round(cor(centralities), 2)
 ```
 
+Podemos observar como las centralidades por grado, cercanía y betweeness se parecen bastante entre ellas, además de con el número de triángulos de cada nodo. Sin embargo, parece que Closeness es la que más difiere de las demás.
 
 ## Análisis de comunidades de la componente conexa mayor (1,5 puntos)
 
 En este apartado, se pide aplicar dos algoritmos de detección de comunidades, compararlos y seleccionar cuál es, en tu opinión, el que da una mejor respuesta. Razona tu selección.
 
-```{r}
-#### infomap, fastgreedy, label propagation, walktrap
+Usaremos los algoritmos de Infomap y de Walktrap para detectar comunidades, calculamos las modularidades para cada uno y comparamos los resultados de los algoritmos:
 
+```{r}
 comms_infomap <- infomap.community(gg3)
 comms_walktrap <- walktrap.community(gg3)
 
@@ -169,11 +220,16 @@ modularity(comms_infomap)
 modularity(comms_walktrap)
 
 compare(comms_infomap, comms_walktrap, method='nmi')
+```
 
+Vemos que la función compare nos devuelve un valor de 0.81, es decir, los algoritmos nos devuelven resultados más o menos parecidos. Para elegir uno de ellos, veremos como éstos dividen a sus comunidades:
+
+```{r}
 table(comms_infomap$membership)
 table(comms_walktrap$membership)
 ```
 
+Vemos que el algoritmo de Infomap divide comunidades de una forma más uniforme, mientras que, el algoritmo Walktrap nos devuelve bastantes comunidades formadas por un solo miembro. Con estos resultados, decidimos quedarnos con Infomap como algoritmo de detección de comunidades.
 
 ## Visualización del grafo por comunidades de la componente conexa mayor (1,5 puntos)
 
@@ -195,7 +251,7 @@ plot(gg3,
 
 ## Difundiendo un rumor (o un virus) en la componente conexa mayor (4 puntos)
 
-Este apartado es el que más peso en la práctica tiene. Vamos a implementar un modelo epidemiológico sobre el grafo que, típicamente, se utiliza para simular escenarios de difusión de enfermedades pero también en contextos como la distribución de rumoeres e información. Vamos a implementar un modelo SIR que se caracteriza por tener los siguientes parámetros:
+Este apartado es el que más peso en la práctica tiene. Vamos a implementar un modelo epidemiológico sobre el grafo que, típicamente, se utiliza para simular escenarios de difusión de enfermedades pero también en contextos como la distribución de rumores e información. Vamos a implementar un modelo SIR que se caracteriza por tener los siguientes parámetros:
 
 * Número de nodos iniciales infectados en el momento t=0 (N).
 * Beta: probabilidad de contagio de un nodo infectado (I) a un nodo susceptible de serlo (S)
@@ -212,6 +268,20 @@ Se pide ejecutar una simulación para tres o cuatro valores del parámetro beta 
 * La curva de nuevos infectados en escala logarítmica para cada caso.
 * El grafo que surge de la cascada de contagios: es decir, dos nodos están enlazados ahora si uno ha contagiado al otro. Como es lógico, tanto los nodos como los enlaces de este nuevo grafo son un subconjunto del grafo original.
 
+En este primer bloque de código, vamos a definir las siguientes funciones:
+
+* generate_sir: recibe N, beta, gamma y un grafo como parámetros, y simula un proceso SIR. Nos devolverá 6 objetos:
+  + contagiados: lista con el número de nodos que se encuentran contagiados cada día.
+  + susceptibles: lista con el número de nodos que son susceptibles cada día.
+  + recuperados: lista con el número de nodos que se encuentran recuperados cada día.
+  + nuevos_contagios: lista con el número de contagiados nuevos de cada día.
+  + iteraciones: número de iteraciones hasta que no vemos infectados nuevos durante, al menos, 3 iteraciones.
+  + grafos: lista con el grafo resultante de cada día.
+* plot_evolution: genera un plot que muestra la evolución de elementos infectados, susceptibles y recuperados.
+* plot_new_infections: genera un plot con la evolución de nuevos infectados en escala logarítmica.
+* plot_infection_graph: genera un plot con el grafo pasado por parámetro con colores según el estado del elemento y según los enlaces de infección.
+* create_gif: genera un gif a partir de una lista de grafos.
+
 ```{r}
 generate_sir <- function(N = 5, beta = 0.1, gamma = 0.1, graph){
   graph <- set_vertex_attr(graph, 'label', value = 'S')
@@ -223,8 +293,8 @@ generate_sir <- function(N = 5, beta = 0.1, gamma = 0.1, graph){
   n_contagiados = N
   n_susceptibles = vcount(graph) - N
   n_recuperados = 0
-  dias_sin_contagios = 0
-  dia = 1
+  iteraciones_sin_contagios = 0
+  iteracion= 1
   
   lista_contagiados = c(n_contagiados)
   lista_susceptibles = c(n_susceptibles)
@@ -232,11 +302,12 @@ generate_sir <- function(N = 5, beta = 0.1, gamma = 0.1, graph){
   lista_nuevos_contagios = c(n_contagiados)
   lista_grafo = list(graph)
   
-  while (dias_sin_contagios < 3){
+  while (iteraciones_sin_contagios < 3){
     n_nuevos_contagios = 0
+    initial_graph <- graph
     
-    for (v in V(graph)){
-      state <- V(graph)[v]$label
+    for (v in V(initial_graph)){
+      state <- V(initial_graph)[v]$label
       
       if (state == 'I'){
         if (rbinom(n=1, size=1, prob = gamma) == 1){
@@ -246,8 +317,8 @@ generate_sir <- function(N = 5, beta = 0.1, gamma = 0.1, graph){
         }
       }
       if (state == 'S'){
-        for (neighbor in neighbors(graph, v)){
-          if ((V(graph)[neighbor]$label == 'I') && (rbinom(n=1, size=1, prob = beta) == 1)){
+        for (neighbor in neighbors(initial_graph, v)){
+          if ((V(initial_graph)[neighbor]$label == 'I') && (rbinom(n=1, size=1, prob = beta) == 1)){
             V(graph)[v]$label <- 'I'
             E(graph)[v %--% neighbor]$label <- 'I'
             n_contagiados = n_contagiados + 1
@@ -259,53 +330,52 @@ generate_sir <- function(N = 5, beta = 0.1, gamma = 0.1, graph){
       }
     }
     if (n_nuevos_contagios == 0){
-      dias_sin_contagios = dias_sin_contagios + 1
+      iteraciones_sin_contagios = iteraciones_sin_contagios + 1
     } else {
-      dias_sin_contagios = 0
+      iteraciones_sin_contagios = 0
     }
-    dia = dia + 1
+    iteracion = iteracion + 1
     lista_contagiados = c(lista_contagiados, n_contagiados)
     lista_susceptibles = c(lista_susceptibles, n_susceptibles)
     lista_recuperados = c(lista_recuperados, n_recuperados)
     lista_nuevos_contagios = c(lista_nuevos_contagios, n_nuevos_contagios)
-    lista_grafo[[dia]] = graph
+    lista_grafo[[iteracion]] = graph
   }
   
-  return (list('final_state' = V(graph)$label,
-               'contagiados' = lista_contagiados,
+  return (list('contagiados' = lista_contagiados,
                'susceptibles' = lista_susceptibles,
                'recuperados' = lista_recuperados,
                'nuevos_contagios' = lista_nuevos_contagios,
-               'dias' = dia,
+               'iteraciones' = iteracion,
                'grafos' = lista_grafo
           ))
 
 }
 
 plot_evolution <- function(evolution){
-  plot(1:evolution$dias, evolution$contagiados, 
+  plot(1:evolution$iteraciones, evolution$contagiados, 
        type = 'l', col = 'red',
-       ylab = 'Nº Personas', xlab = 'Días', 
-       ylim = c(0, max(evolution$susceptibles)))
-  lines(1:evolution$dias, evolution$recuperados, 
-        type = 'l', col="green")
-  lines(1:evolution$dias, evolution$susceptibles, 
-        type = 'l', col="blue")
-  
-  legend(evolution$dias, max(evolution$susceptibles)/2, 
+       ylab = 'Nº Nodos', xlab = 'Iteraciones', 
+       ylim = c(0, max(evolution$susceptibles)),
+       main = 'Evolución')
+  lines(1:evolution$iteraciones, evolution$recuperados, 
+        type = 'l', col='green')
+  lines(1:evolution$iteraciones, evolution$susceptibles, 
+        type = 'l', col='blue')
+  legend(evolution$iteraciones, max(evolution$susceptibles)/2, 
          legend=c('Contagiados', 'Recuperados', 'Susceptibles'),
-         col=c("red", 'green', "blue"), 
+         col=c('red', 'green', 'blue'), 
          lty=1, cex=0.8, xjust = 1)
 }
 
-plot_new_infections <- function(list_new_infections, dias){
-  plot(1:dias, list_new_infections, 
+plot_new_infections <- function(list_new_infections, iteraciones){
+  plot(1:iteraciones, list_new_infections, 
        type = 'o', col = 'red', log = 'y', 
-       ylab = 'Nº Personas', xlab = 'Días')
+       ylab = 'Nº Nuevos Infectados', xlab = 'Iteraciones',
+       main = 'Nuevos infectados')
 }
 
 plot_infection_graph <- function(graph, index){
-  
   graph_colors <- ifelse(V(graph)$label == 'I', 'red',
                        ifelse(V(graph)$label == 'R', 'green', 'blue'))
 
@@ -317,7 +387,7 @@ plot_infection_graph <- function(graph, index){
        vertex.size = log(degree(graph)),
        edge.label = '',
        vertex.color = graph_colors,
-       main = paste('Dia', index))
+       main = paste('Iteración', index))
   
 }
 
@@ -332,6 +402,12 @@ create_gif <- function(list_graphs){
 }
 ```
 
+Veremos distintas ejecuciones del simulador del proceso SIR, dibujando las gráficas y los GIF correspondientes a cada una de ellas. 
+
+Nuestras distintas ejecuciones tendrán como parámetros los mismos valores para gamma (probabilidad de recuperación; gamma = 0.1), N (número de nodos iniciales infectados; N = 5) y el grafo (utilizaremos el grafo resultante de los apartados anteriores). El parámetro que vamos a ir variando será el beta.
+
+### Beta = 0.1
+
 ```{r}
 ejemplo_SIR_1 <- generate_sir(graph = gg3, beta = 0.1)
 
@@ -339,13 +415,14 @@ plot_evolution(ejemplo_SIR_1)
 ```
 
 ```{r}
-plot_new_infections(ejemplo_SIR_1$nuevos_contagios, ejemplo_SIR_1$dias)
+plot_new_infections(ejemplo_SIR_1$nuevos_contagios, ejemplo_SIR_1$iteraciones)
 ```
-
 
 ```{r, fig.width=30, fig.height=30}
 create_gif(ejemplo_SIR_1$grafos)
 ```
+
+### Beta = 0.05
 
 ```{r}
 ejemplo_SIR_2 <- generate_sir(graph = gg3, beta = 0.05)
@@ -354,12 +431,14 @@ plot_evolution(ejemplo_SIR_2)
 ```
 
 ```{r}
-plot_new_infections(ejemplo_SIR_2$nuevos_contagios, ejemplo_SIR_2$dias)
+plot_new_infections(ejemplo_SIR_2$nuevos_contagios, ejemplo_SIR_2$iteraciones)
 ```
 
 ```{r, fig.width=30, fig.height=30}
 create_gif(ejemplo_SIR_2$grafos)
 ```
+
+### Beta = 0.01
 
 ```{r}
 ejemplo_SIR_3 <- generate_sir(graph = gg3, beta = 0.01)
@@ -367,11 +446,9 @@ ejemplo_SIR_3 <- generate_sir(graph = gg3, beta = 0.01)
 plot_evolution(ejemplo_SIR_3)
 ```
 
-
 ```{r}
-plot_new_infections(ejemplo_SIR_3$nuevos_contagios, ejemplo_SIR_3$dias)
+plot_new_infections(ejemplo_SIR_3$nuevos_contagios, ejemplo_SIR_3$iteraciones)
 ```
-
 
 ```{r, fig.width=30, fig.height=30}
 create_gif(ejemplo_SIR_3$grafos)

@@ -3,7 +3,6 @@ title: "Ejercicio práctico desarrollo modelo de credit scoring"
 author: "Daniel Fuentes "
 date: "Mayo 2022"
 output:
-  word_document: default
   html_document: default
   pdf_document: default
 ---
@@ -23,11 +22,11 @@ https://www.lendingclub.com/info/download-data.action
 
 Se trata de una Fintech que concede préstamos a través de dinero de inversores. Cada solicitud es evaluada y catalogada en diferentes categorías de riesgo. Los inversores recibirán un mayor o menor interés en función de como de riesgosa sea la cartera de préstamos en los que invierta.
 
-<iframe width="560" height="315" src="https://www.youtube.com/watch?v=EMpQvwxQ57U" frameborder="0" allowfullscreen></iframe>
+<!-- <iframe width="560" height="315" src="https://www.youtube.com/watch?v=EMpQvwxQ57U" frameborder="0" allowfullscreen></iframe> -->
 
 
-<iframe width="560" height="315" src="https://www.youtube.com/watch?v=8_5w8yCAqDA
-" frameborder="0" allowfullscreen></iframe>
+<!-- <iframe width="560" height="315" src="https://www.youtube.com/watch?v=8_5w8yCAqDA -->
+<!-- " frameborder="0" allowfullscreen></iframe> -->
 
 
 Además proveen de un excel con el significado de cada variable.
@@ -116,7 +115,7 @@ Vamos a cargar la base de datos que hemos preparado y analizar todas las variabl
 # load("Database_LoansAFI.RData")
 
 library(readxl)
-Loans <- read_excel("C:/Users/danie/Desktop/AFI 2022/1-CreditScoring/Loans.xlsx")
+Loans <- read_excel("C:/Users/Javier/Documents/masterAFI/20. Masterclass/06. Credit Scoring/Loans.xlsx")
 colnames(Loans)
 dim(Loans)
 
