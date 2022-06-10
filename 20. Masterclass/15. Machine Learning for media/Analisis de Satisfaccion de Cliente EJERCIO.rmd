@@ -1,0 +1,111 @@
+---
+title: "Analisis Satisfaccion de Cliente"
+author: "Juan Carlos Ibanez"
+date: "2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = '../working/Customer Satisfaction')
+```
+
+## 1. Introduction
+
+Customer Experience and Satisfaction is a key point in today business.
+
+For this analysis we have a survey of customer satifaction questions for a set of customers in 5 different companies.
+
+The dataset is a sample from a real-life bigger one. 
+
+As the responsable for customer experience in one of this companies, you are asked to solve several business questions as:   
+
+  1. What are they key questions to ask to a customer in order to understand his opinion
+  2. How many questions do we need to ask in order to register a good view of the customer experience with our customer
+  3. What are the "dimensions" of the customer satisfaction
+  4. Which dimensions are the most important ones
+  5. Are those dimensions different for young customers (quantile 50% of age), than for olders
+
+## 2. Data Cleansing and Preparation
+
+
+```{r}
+#
+#
+#
+```
+
+
+## 3. Exploratory Data Analysis
+
+```{r}
+#
+#
+#
+```
+
+## 4. What are the most important areas/dimensions in customer satisfaction in the mobile telecomunications business?
+
+```{r}
+#
+#
+#
+```
+
+### 4.1. Principal Component Analysis
+
+Try a Principal Component Analysis to study the dimensions of customer satisfaction
+```{r}
+#
+#
+#
+```
+
+How many PCs will you select to keep a 70% of the variability?
+```{r}
+#
+#
+#
+```
+
+
+### 4.2. Factor Analysis
+
+How many factors do we need in order to keep a 70% of the original information
+```{r}
+#
+#
+#
+```
+
+Explain the factors you have found
+```{r}
+#
+#
+#
+```
+How many dimensions for the customer satisfaccion will you choose
+```{r}
+#
+#
+#
+```
+
+## 5. What is the impact of each dimension in recomendation?
+
+Calculate the regression between the factors and the vatiable RECOMENDACION  
+
+### 5.1. Multiple Regression Analysis
+
+```{r}
+#
+#
+#
+```
+#### 5.2. What dimensions are more important for global satisfaction?
+
+```{r}
+#
+#
+#
+```
